@@ -96,3 +96,7 @@ logger.info('Job started', {
   meta: { jobId: 'job-789' }
 });
 ```
+
+TOKEN_HMAC_SECRET=RIENADIREMAISJEVAISESSAYERCA2026
+
+MEDIA_BASE_URL=https://kpata-media-worker.kpata-ai.workers.dev
