@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "KPATA AI",
+    "slug": "kpata-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.kpata.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "KPATA AI a besoin d'accéder à votre caméra pour prendre des photos de produits.",
+        "NSPhotoLibraryUsageDescription": "KPATA AI a besoin d'accéder à vos photos pour importer des images de produits."
+      }
+    },
+    "android": {
+      "package": "ai.kpata.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "scheme": "kpata",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Autoriser KPATA AI à accéder à votre caméra."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autoriser KPATA AI à accéder à vos photos."
+        }
+      ],
+      "expo-font",
+      "expo-secure-store"
+    ]
+  }
+}
