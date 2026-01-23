@@ -1,0 +1,83 @@
+/**
+ * User Profile Routes for KPATA AI API
+ * GET /me - Returns current user profile with capabilities
+ */
+
+import { UserRole } from '@kpata/shared';
+import { Router, Request, Response, NextFunction } from 'express';
+
+import { UnauthorizedError } from '../lib/errors.js';
+import { getCapabilities, getPlanByRole } from '../lib/plans.js';
+import { getSupabaseClient } from '../lib/supabase.js';
+import { logger } from '../logger.js';
+
+const router: Router = Router();
+
+/**
+ * GET /me
+ * Returns current user profile with plan capabilities
+ */
+router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const correlationId = req.correlationId;
+    const supabase = getSupabaseClient();
+
+    // Get full profile with credit balance
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', req.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      throw new UnauthorizedError('Profile not found');
+    }
+
+    // Get credit balance
+    const { data: balanceData, error: balanceError } = await supabase
+      .rpc('get_credit_balance', { p_user_id: req.user.id });
+
+    const creditBalance = balanceError ? 0 : (balanceData || 0);
+
+    // Get plan and capabilities
+    const role = profile.role as UserRole;
+    const plan = getPlanByRole(role);
+    const capabilities = getCapabilities(role);
+
+    logger.info('Profile fetched', {
+      action: 'get_me',
+      correlation_id: correlationId,
+      user_id: req.user.id,
+    });
+
+    res.json({
+      profile: {
+        id: profile.id,
+        phone: profile.phone,
+        role: profile.role,
+        displayName: profile.display_name,
+        avatarUrl: profile.avatar_url,
+        termsAcceptedAt: profile.terms_accepted_at,
+        termsVersion: profile.terms_version,
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at,
+      },
+      plan: {
+        id: plan.id,
+        name: plan.name,
+      },
+      capabilities,
+      credits: {
+        balance: creditBalance,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;

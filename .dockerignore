@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+.next
+.nuxt
+
+# Expo
+apps/mobile
+.expo
+
+# Environment files (will be mounted separately)
+.env
+**/.env
+.env.local
+**/.env.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+logs
+
+# Test files
+**/*.test.ts
+**/*.spec.ts
+coverage
+.nyc_output
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Misc
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp

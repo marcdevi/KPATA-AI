@@ -1,0 +1,9 @@
+# ===========================================
+# KPATA AI - Media Worker (Cloudflare) Secrets
+# ===========================================
+# Copy this file to .dev.vars for local development
+# In production, set via: wrangler secret put <SECRET_NAME>
+
+# HMAC Secret for media token validation (min 32 chars)
+# Must match MEDIA_TOKEN_SECRET in API service
+MEDIA_TOKEN_SECRET=your-hmac-secret-key-minimum-32-characters-long

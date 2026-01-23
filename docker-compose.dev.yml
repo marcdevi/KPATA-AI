@@ -1,0 +1,106 @@
+# Development docker-compose with hot reload
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  # Redis for BullMQ queues and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: kpata-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kpata-network-dev
+
+  # API Service (Express) - Development with hot reload
+  api:
+    image: node:20-alpine
+    container_name: kpata-api-dev
+    working_dir: /app/services/api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - HOST=0.0.0.0
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - services/api/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/services/api/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm dev"
+    networks:
+      - kpata-network-dev
+    restart: unless-stopped
+
+  # Worker Service (BullMQ) - Development with hot reload
+  worker:
+    image: node:20-alpine
+    container_name: kpata-worker-dev
+    working_dir: /app/services/worker
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - services/worker/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/services/worker/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm dev"
+    networks:
+      - kpata-network-dev
+    restart: unless-stopped
+
+  # Telegram Bot - Development with hot reload
+  telegram-bot:
+    image: node:20-alpine
+    container_name: kpata-telegram-bot-dev
+    working_dir: /app/services/telegram-bot
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - API_BASE_URL=http://api:3000
+    env_file:
+      - services/telegram-bot/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/services/telegram-bot/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm dev"
+    networks:
+      - kpata-network-dev
+    restart: unless-stopped
+    profiles:
+      - with-bot
+
+volumes:
+  redis_data_dev:
+
+networks:
+  kpata-network-dev:
+    driver: bridge

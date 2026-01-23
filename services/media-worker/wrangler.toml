@@ -1,0 +1,23 @@
+name = "kpata-media-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+ENVIRONMENT = "development"
+
+# Custom domain: media.kpata.ai
+# Configure in Cloudflare Dashboard > Workers > Routes
+# routes = [{ pattern = "media.kpata.ai/*", zone_name = "kpata.ai" }]
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "kpata-raw-upload"
+preview_bucket_name = "kpata-raw-upload-preview"
+
+[[r2_buckets]]
+binding = "GALLERY_BUCKET"
+bucket_name = "kpata-public-gallery"
+preview_bucket_name = "kpata-public-gallery-preview"
+
+# Secrets (set via wrangler secret put):
+# - MEDIA_TOKEN_SECRET: HMAC secret for token validation

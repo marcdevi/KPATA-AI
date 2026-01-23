@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # Redis for BullMQ queues and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: kpata-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kpata-network
+
+  # API Service (Express)
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    container_name: kpata-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - HOST=0.0.0.0
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - services/api/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./packages/shared:/app/packages/shared:ro
+    networks:
+      - kpata-network
+    restart: unless-stopped
+
+  # Worker Service (BullMQ)
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    container_name: kpata-worker
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - services/worker/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    volumes:
+      - ./packages/shared:/app/packages/shared:ro
+    networks:
+      - kpata-network
+    restart: unless-stopped
+
+  # Telegram Bot (optional)
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: services/telegram-bot/Dockerfile
+    container_name: kpata-telegram-bot
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - services/telegram-bot/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    networks:
+      - kpata-network
+    restart: unless-stopped
+    profiles:
+      - with-bot
+
+volumes:
+  redis_data:
+
+networks:
+  kpata-network:
+    driver: bridge

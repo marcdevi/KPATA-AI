@@ -1,0 +1,19 @@
+{
+  "name": "@kpata/admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "echo 'Admin dashboard dev server - to be configured with Next.js/Vite'",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@kpata/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.0"
+  }
+}
