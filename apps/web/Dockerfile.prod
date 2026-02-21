@@ -26,24 +26,15 @@ WORKDIR /app/packages/shared
 RUN pnpm build
 
 # Build Next.js app
-FROM base AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
+FROM deps AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages ./packages
-COPY --from=deps /app/apps/web ./apps/web
-COPY --from=deps /app/package.json ./package.json
-COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
-
-WORKDIR /app/apps/web
-
-# Build arguments for environment variables
+# Accept build arguments for public environment variables
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+# Set them as environment variables for the build process
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
