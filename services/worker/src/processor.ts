@@ -21,7 +21,7 @@ const IMAGE_FORMATS = {
   whatsapp: { width: 1080, height: 1920, variant: 'whatsapp' },
 } as const;
 
-const THUMBNAIL_SIZES = [150, 300] as const;
+const THUMBNAIL_SIZES = [256, 512] as const;
 
 /**
  * Get Supabase client (singleton)
@@ -367,7 +367,7 @@ async function uploadResult(
       if (hasR2) {
         // Upload to R2
         const uploadResult = await uploadGalleryImage(
-          { userId: profileId, jobId, pipelineVersion: 1, variant: format.variant },
+          { userId: profileId, jobId, pipelineVersion: 1, variant: 'optimized' },
           resizedBuffer,
           { correlationId, contentType: 'image/webp' }
         );

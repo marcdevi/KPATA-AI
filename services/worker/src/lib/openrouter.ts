@@ -159,7 +159,7 @@ export async function generateImage(
       throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const duration = Date.now() - startTime;
 
     // Extract image from response - OpenRouter returns images in message.images array

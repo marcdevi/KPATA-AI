@@ -34,6 +34,12 @@ export interface JobPayload {
   templateLayout: string;
   mannequinMode: string;
   sourceChannel: string;
+  inputImageBase64?: string;
+  mannequinFaceBucket?: string;
+  mannequinFaceKey?: string;
+  mannequinBodyBucket?: string;
+  mannequinBodyKey?: string;
+  customPrompt?: string;
 }
 
 export interface ProcessorContext {
