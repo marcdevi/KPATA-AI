@@ -34,7 +34,7 @@ import voiceRoutes from './routes/voice.js';
 export function createApp(): Express {
   const app = express();
 
-  // CORS configuration for PWA development
+  // CORS configuration for PWA development and production
   app.use(cors({
     origin: [
       'http://localhost:3001',
@@ -47,6 +47,9 @@ export function createApp(): Express {
       'http://192.168.0.24:3004',
       'http://192.168.0.24:8081',
       'http://192.168.0.24:8082',
+      'https://app.kpata-ai.online',
+      'https://kpata-ai.online',
+      'https://www.kpata-ai.online',
     ],
     credentials: true,
   }));
