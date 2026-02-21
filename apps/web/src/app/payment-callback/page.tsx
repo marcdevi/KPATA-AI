@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import LoadingScreen from '@/components/LoadingScreen';
 import { verifyPaystack } from '@/lib/api';
 
-export default function PaymentCallbackPage() {
+function PaymentCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reference = searchParams.get('reference');
@@ -157,5 +157,13 @@ export default function PaymentCallbackPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+export default function PaymentCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <PaymentCallbackContent />
+    </Suspense>
   );
 }
