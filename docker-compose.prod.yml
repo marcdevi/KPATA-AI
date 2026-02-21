@@ -106,24 +106,27 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile.prod
-      target: runner
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.kpata-ai.online}
         - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
         - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-    container_name: kpata-web-prod
+    image: kpata-ai-web
+    container_name: kpata-ai-web
+    restart: always
     ports:
       - "3001:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.kpata-ai.online}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - HOSTNAME=0.0.0.0
     depends_on:
       api:
         condition: service_healthy
     networks:
       - kpata-network-prod
-    restart: always
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
