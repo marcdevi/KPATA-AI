@@ -56,7 +56,7 @@ const updateRoutingSchema = z.object({
 
 router.patch(
   '/model-routing/:id',
-  requireRole([UserRole.SUPER_ADMIN]),
+  requireRole(UserRole.SUPER_ADMIN),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -110,13 +110,13 @@ router.patch(
 const updatePromptSchema = z.object({
   prompt: z.string().optional(),
   negative_prompt: z.string().optional(),
-  params_json: z.record(z.unknown()).optional(),
+  params_json: z.record(z.string(), z.unknown()).optional(),
   active: z.boolean().optional(),
 });
 
 router.patch(
   '/prompt-profiles/:id',
-  requireRole([UserRole.SUPER_ADMIN]),
+  requireRole(UserRole.SUPER_ADMIN),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {

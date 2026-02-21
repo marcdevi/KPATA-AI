@@ -95,7 +95,7 @@ ${hasMannequin ? 'L\'utilisateur a un mannequin personnalisé configuré.' : ''}
       throw new Error(`OpenRouter error: ${response.status} - ${err}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const content = data.choices?.[0]?.message?.content || '';
 
     let parsed: {

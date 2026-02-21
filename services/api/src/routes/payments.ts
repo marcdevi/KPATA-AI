@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { UnauthorizedError, BadRequestError, NotFoundError } from '../lib/errors.js';
 import { normalizePhone } from '../lib/phone.js';
-import { paystackInitializeTransaction, paystackVerifyTransaction, verifyPaystackSignature } from '../lib/paystack.js';
+import { paystackInitializeTransaction, verifyPaystackSignature } from '../lib/paystack.js';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { upgradeToProOnTopup } from '../lib/upgrade.js';
 import { validateBody } from '../lib/validation.js';
@@ -157,10 +157,10 @@ router.post('/init', async (req: Request, res: Response, next: NextFunction): Pr
 
     const input = validateBody(initPaymentSchema, req.body);
     const correlationId = req.correlationId;
-    const userId = req.user.id;
+    const userId = req.user!.id;
 
     // Normalize phone if provided
-    const phoneE164 = input.phoneE164 ? normalizePhone(input.phoneE164) : req.user.phone;
+    const phoneE164 = input.phoneE164 ? normalizePhone(input.phoneE164) : req.user!.phone;
 
     const supabase = getSupabaseClient();
 
@@ -353,7 +353,6 @@ router.post('/webhook/:provider', async (req: Request, res: Response, next: Next
     }
 
     const input = validateBody(webhookSchema, req.body);
-    const supabase = getSupabaseClient();
 
     logger.info('Payment webhook received', {
       action: 'payment_webhook_received',
@@ -454,7 +453,7 @@ router.get('/test-success/:reference', async (req: Request, res: Response, next:
       throw new UnauthorizedError('Test endpoint disabled in production');
     }
 
-    const reference = req.params.reference;
+    const reference = Array.isArray(req.params.reference) ? req.params.reference[0] : req.params.reference;
     const correlationId = req.correlationId;
 
     const result = await processWebhookUpdate({
