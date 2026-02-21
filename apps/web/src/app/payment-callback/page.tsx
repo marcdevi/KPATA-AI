@@ -11,7 +11,6 @@ export default function PaymentCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reference = searchParams.get('reference');
-  const { refreshProfile } = useAuthStore();
 
   const [status, setStatus] = useState<'checking' | 'success' | 'failed' | 'pending'>('checking');
   const [message, setMessage] = useState('Vérification du paiement en cours...');
@@ -37,7 +36,6 @@ export default function PaymentCallbackPage() {
           if (intervalId) clearInterval(intervalId);
           setStatus('success');
           setMessage('Paiement confirmé ! Tes crédits ont été ajoutés.');
-          await refreshProfile();
           
           setTimeout(() => {
             router.push('/credits');
@@ -94,7 +92,7 @@ export default function PaymentCallbackPage() {
         clearInterval(intervalId);
       }
     };
-  }, [reference, router, refreshProfile]);
+  }, [reference, router]);
 
   if (!reference) {
     return (
