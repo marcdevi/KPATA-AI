@@ -49,6 +49,11 @@ COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 WORKDIR /app/apps/web
 
+# Create a hardcoded .env.production for the build stage to ensure it's picked up
+RUN echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" > .env.production
+RUN echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" >> .env.production
+RUN echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> .env.production
+
 RUN pnpm build
 
 # Production image
