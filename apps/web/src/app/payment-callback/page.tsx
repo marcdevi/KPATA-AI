@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import LoadingScreen from '@/components/LoadingScreen';
 import { verifyPaystack } from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
 
 export default function PaymentCallbackPage() {
   const router = useRouter();
