@@ -298,7 +298,6 @@ router.post('/webhook/paystack', async (req: Request, res: Response, next: NextF
     logger.info('Paystack verify normalized status', {
       action: 'paystack_verify_normalized',
       correlation_id: correlationId,
-      user_id: req.user!.id,
       meta: { reference, normalizedStatus },
     });
 
