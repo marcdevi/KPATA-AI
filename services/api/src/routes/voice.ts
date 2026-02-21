@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../logger.js';
 
-const router = Router();
+const router: Router = Router();
 
 const analyzeSchema = z.object({
   transcript: z.string().min(1).max(2000),

@@ -150,6 +150,8 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
       throw new Error('JWT_SECRET not configured');
     }
 
+    const expiresIn: string | number = process.env.JWT_EXPIRES_IN || '7d';
+    // @ts-ignore - TypeScript strict mode issue with jwt.sign overloads
     const token = jwt.sign(
       {
         sub: profile.id,
@@ -157,7 +159,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
         role: profile.role,
       },
       jwtSecret,
-      { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string }
+      { expiresIn }
     );
 
     const capabilities = getCapabilities(profile.role as UserRole);

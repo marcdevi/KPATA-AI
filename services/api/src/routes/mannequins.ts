@@ -42,7 +42,7 @@ async function uploadToR2(key: string, buffer: Buffer, contentType: string): Pro
   };
 }
 
-const router = Router();
+const router: Router = Router();
 
 // Validation schemas
 const createMannequinSchema = z.object({
