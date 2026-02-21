@@ -10,12 +10,110 @@ import { z } from 'zod';
 
 import { UnauthorizedError, BadRequestError, NotFoundError } from '../lib/errors.js';
 import { normalizePhone } from '../lib/phone.js';
+import { paystackInitializeTransaction, paystackVerifyTransaction, verifyPaystackSignature } from '../lib/paystack.js';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { upgradeToProOnTopup } from '../lib/upgrade.js';
 import { validateBody } from '../lib/validation.js';
 import { logger } from '../logger.js';
 
 const router: Router = Router();
+
+async function processWebhookUpdate(input: {
+  provider: PaymentProvider;
+  providerRef: string;
+  status: 'succeeded' | 'failed' | 'canceled';
+  rawEvent?: Record<string, unknown>;
+  correlationId?: string;
+}): Promise<{ paymentId: string; creditsAdded?: number; alreadyProcessed?: boolean }> {
+  const supabase = getSupabaseClient();
+
+  // Find existing payment
+  const { data: existingPayment, error: findError } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('provider', input.provider)
+    .eq('provider_ref', input.providerRef)
+    .single();
+
+  if (findError && findError.code !== 'PGRST116') {
+    throw findError;
+  }
+
+  if (!existingPayment) {
+    throw new NotFoundError(`Payment not found: ${input.providerRef}`, { providerRef: input.providerRef });
+  }
+
+  // Check if already processed (idempotent)
+  if (existingPayment.status === PaymentStatus.SUCCEEDED) {
+    return { paymentId: existingPayment.id, alreadyProcessed: true };
+  }
+
+  if (input.status === 'succeeded') {
+    // Check if topup already exists in ledger (double-check idempotency)
+    const { data: existingLedger } = await supabase
+      .from('credit_ledger')
+      .select('id')
+      .eq('payment_id', existingPayment.id)
+      .eq('entry_type', 'topup')
+      .single();
+
+    if (existingLedger) {
+      return { paymentId: existingPayment.id, alreadyProcessed: true };
+    }
+
+    await supabase
+      .from('payments')
+      .update({
+        status: PaymentStatus.SUCCEEDED,
+        raw_event: input.rawEvent,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', existingPayment.id);
+
+    const idempotencyKey = `topup_${input.provider}_${input.providerRef}`;
+
+    const { error: ledgerError } = await supabase
+      .from('credit_ledger')
+      .insert({
+        profile_id: existingPayment.profile_id,
+        entry_type: 'topup',
+        amount: existingPayment.credits_granted,
+        payment_id: existingPayment.id,
+        idempotency_key: idempotencyKey,
+        description: `Credit pack purchase: ${existingPayment.pack_code}`,
+      });
+
+    if (ledgerError) {
+      if (ledgerError.code !== '23505') {
+        throw ledgerError;
+      }
+    }
+
+    try {
+      await upgradeToProOnTopup(existingPayment.profile_id, input.correlationId);
+    } catch (upgradeError) {
+      logger.error('Failed to upgrade user to pro', {
+        action: 'payment_webhook_upgrade_error',
+        correlation_id: input.correlationId,
+        user_id: existingPayment.profile_id,
+        meta: { error: String(upgradeError) },
+      });
+    }
+
+    return { paymentId: existingPayment.id, creditsAdded: existingPayment.credits_granted };
+  }
+
+  await supabase
+    .from('payments')
+    .update({
+      status: input.status === 'failed' ? PaymentStatus.FAILED : PaymentStatus.CANCELED,
+      raw_event: input.rawEvent,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', existingPayment.id);
+
+  return { paymentId: existingPayment.id };
+}
 
 /**
  * GET /payments/packs
@@ -101,6 +199,47 @@ router.post('/init', async (req: Request, res: Response, next: NextFunction): Pr
       throw paymentError;
     }
 
+    // Paystack: initialize transaction and return checkout url
+    if (input.provider === PaymentProvider.PAYSTACK) {
+      const email = req.user.email;
+      if (!email) {
+        throw new BadRequestError('Email is required for Paystack payments');
+      }
+
+      // Construct callback URL for redirect after payment
+      const webAppUrl = process.env.WEB_APP_URL || 'http://localhost:3001';
+      const callbackUrl = `${webAppUrl}/payment-callback?reference=${encodeURIComponent(providerRef)}`;
+
+      const { authorizationUrl } = await paystackInitializeTransaction({
+        email,
+        // Paystack expects minor units
+        amount: pack.price_xof * 100,
+        currency: 'XOF',
+        reference: providerRef,
+        callbackUrl,
+        metadata: {
+          paymentId: payment.id,
+          profileId: userId,
+          packCode: input.packCode,
+          creditsGranted: pack.credits,
+        },
+      });
+
+      res.status(201).json({
+        payment: {
+          id: payment.id,
+          providerRef,
+          provider: input.provider,
+          packCode: input.packCode,
+          amountXof: pack.price_xof,
+          credits: pack.credits,
+          status: payment.status,
+        },
+        redirectUrl: authorizationUrl,
+      });
+      return;
+    }
+
     logger.info('Payment initialized', {
       action: 'payment_init',
       correlation_id: correlationId,
@@ -126,6 +265,68 @@ router.post('/init', async (req: Request, res: Response, next: NextFunction): Pr
       },
       // paymentUrl: 'https://provider.com/pay/...' // Would come from provider
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /payments/webhook/paystack
+ * Paystack webhook handler
+ */
+router.post('/webhook/paystack', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const correlationId = req.correlationId;
+    const signature = req.headers['x-paystack-signature'] as string | undefined;
+    const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
+
+    if (!rawBody || !verifyPaystackSignature(rawBody, signature)) {
+      throw new UnauthorizedError('Invalid Paystack signature');
+    }
+
+    const event = req.body as { event?: string; data?: { reference?: string; status?: string } };
+    const reference = event.data?.reference;
+    const status = event.data?.status;
+
+    if (!reference || !status) {
+      throw new BadRequestError('Invalid Paystack payload');
+    }
+
+    const normalizedStatus: 'succeeded' | 'failed' | 'canceled' | 'pending' =
+      status === 'success' ? 'succeeded' : status === 'failed' ? 'failed' : status === 'abandoned' ? 'canceled' : 'pending';
+
+    logger.info('Paystack verify normalized status', {
+      action: 'paystack_verify_normalized',
+      correlation_id: correlationId,
+      user_id: req.user.id,
+      meta: { reference, normalizedStatus },
+    });
+
+    if (normalizedStatus === 'pending') {
+      logger.info('Paystack webhook received but still pending', {
+        action: 'paystack_webhook_pending',
+        correlation_id: correlationId,
+        meta: { reference, status },
+      });
+      res.json({ success: true });
+      return;
+    }
+
+    const result = await processWebhookUpdate({
+      provider: PaymentProvider.PAYSTACK,
+      providerRef: reference,
+      status: normalizedStatus,
+      rawEvent: req.body,
+      correlationId,
+    });
+
+    logger.info('Paystack webhook processed', {
+      action: 'paystack_webhook_processed',
+      correlation_id: correlationId,
+      meta: { reference, normalizedStatus, paymentId: result.paymentId },
+    });
+
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }
@@ -160,152 +361,116 @@ router.post('/webhook/:provider', async (req: Request, res: Response, next: Next
       meta: { provider, providerRef: input.providerRef, status: input.status },
     });
 
-    // Find existing payment
-    const { data: existingPayment, error: findError } = await supabase
+    const result = await processWebhookUpdate({
+      provider,
+      providerRef: input.providerRef,
+      status: input.status,
+      rawEvent: input.rawEvent,
+      correlationId,
+    });
+
+    res.json({
+      success: true,
+      message: result.alreadyProcessed ? 'Payment already processed' : 'Payment processed',
+      paymentId: result.paymentId,
+      creditsAdded: result.creditsAdded,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /payments/verify/:reference
+ * Check payment status (no auth required for callback page)
+ * This endpoint only checks the DB status - actual validation is done by webhook
+ */
+router.get('/verify/:reference', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const correlationId = req.correlationId;
+    const reference = req.params.reference;
+    if (!reference) {
+      throw new BadRequestError('Missing reference');
+    }
+
+    const supabase = getSupabaseClient();
+
+    // Find payment by reference
+    const { data: payment, error: findError } = await supabase
       .from('payments')
       .select('*')
-      .eq('provider', provider)
-      .eq('provider_ref', input.providerRef)
+      .eq('provider', PaymentProvider.PAYSTACK)
+      .eq('provider_ref', reference)
       .single();
 
-    if (findError && findError.code !== 'PGRST116') {
-      throw findError;
-    }
-
-    if (!existingPayment) {
-      throw new NotFoundError(`Payment not found: ${input.providerRef}`, { providerRef: input.providerRef });
-    }
-
-    // Check if already processed (idempotent)
-    if (existingPayment.status === PaymentStatus.SUCCEEDED) {
-      logger.info('Payment already processed (idempotent)', {
-        action: 'payment_webhook_idempotent',
+    if (findError || !payment) {
+      logger.warn('Payment not found for verification', {
+        action: 'payment_verify_not_found',
         correlation_id: correlationId,
-        meta: { paymentId: existingPayment.id, providerRef: input.providerRef },
+        meta: { reference },
       });
-
       res.json({
-        success: true,
-        message: 'Payment already processed',
-        paymentId: existingPayment.id,
+        ok: true,
+        status: 'pending',
       });
       return;
     }
 
-    // Handle based on status
-    if (input.status === 'succeeded') {
-      // Check if topup already exists in ledger (double-check idempotency)
-      const { data: existingLedger } = await supabase
-        .from('credit_ledger')
-        .select('id')
-        .eq('payment_id', existingPayment.id)
-        .eq('entry_type', 'topup')
-        .single();
+    logger.info('Payment status check', {
+      action: 'payment_verify_status',
+      correlation_id: correlationId,
+      meta: { reference, status: payment.status },
+    });
 
-      if (existingLedger) {
-        logger.info('Topup ledger entry already exists (idempotent)', {
-          action: 'payment_webhook_ledger_exists',
-          correlation_id: correlationId,
-          meta: { paymentId: existingPayment.id },
-        });
-
-        res.json({
-          success: true,
-          message: 'Payment already processed',
-          paymentId: existingPayment.id,
-        });
-        return;
-      }
-
-      // Update payment status
-      await supabase
-        .from('payments')
-        .update({
-          status: PaymentStatus.SUCCEEDED,
-          raw_event: input.rawEvent,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', existingPayment.id);
-
-      // Add credits to ledger
-      const idempotencyKey = `topup_${provider}_${input.providerRef}`;
-      
-      const { error: ledgerError } = await supabase
-        .from('credit_ledger')
-        .insert({
-          profile_id: existingPayment.profile_id,
-          entry_type: 'topup',
-          amount: existingPayment.credits_granted,
-          payment_id: existingPayment.id,
-          idempotency_key: idempotencyKey,
-          description: `Credit pack purchase: ${existingPayment.pack_code}`,
-        });
-
-      if (ledgerError) {
-        // Check if it's a duplicate (idempotent)
-        if (ledgerError.code === '23505') {
-          logger.info('Ledger entry already exists (concurrent)', {
-            action: 'payment_webhook_ledger_concurrent',
-            correlation_id: correlationId,
-            meta: { paymentId: existingPayment.id },
-          });
-        } else {
-          throw ledgerError;
-        }
-      }
-
-      // Upgrade user to pro on first successful topup
-      try {
-        await upgradeToProOnTopup(existingPayment.profile_id, correlationId);
-      } catch (upgradeError) {
-        // Log but don't fail the webhook
-        logger.error('Failed to upgrade user to pro', {
-          action: 'payment_webhook_upgrade_error',
-          correlation_id: correlationId,
-          user_id: existingPayment.profile_id,
-          meta: { error: String(upgradeError) },
-        });
-      }
-
-      logger.info('Payment succeeded and credits added', {
-        action: 'payment_webhook_success',
-        correlation_id: correlationId,
-        user_id: existingPayment.profile_id,
-        meta: {
-          paymentId: existingPayment.id,
-          creditsAdded: existingPayment.credits_granted,
-        },
-      });
-
-      res.json({
-        success: true,
-        message: 'Payment processed successfully',
-        paymentId: existingPayment.id,
-        creditsAdded: existingPayment.credits_granted,
-      });
-    } else {
-      // Failed or canceled
-      await supabase
-        .from('payments')
-        .update({
-          status: input.status === 'failed' ? PaymentStatus.FAILED : PaymentStatus.CANCELED,
-          raw_event: input.rawEvent,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', existingPayment.id);
-
-      logger.info('Payment failed/canceled', {
-        action: 'payment_webhook_failed',
-        correlation_id: correlationId,
-        meta: { paymentId: existingPayment.id, status: input.status },
-      });
-
-      res.json({
-        success: true,
-        message: `Payment ${input.status}`,
-        paymentId: existingPayment.id,
-      });
+    // Map DB status to response status
+    let status: 'succeeded' | 'failed' | 'canceled' | 'pending' = 'pending';
+    if (payment.status === PaymentStatus.SUCCEEDED) {
+      status = 'succeeded';
+    } else if (payment.status === PaymentStatus.FAILED) {
+      status = 'failed';
+    } else if (payment.status === PaymentStatus.CANCELED) {
+      status = 'canceled';
     }
+
+    res.json({
+      ok: true,
+      status,
+      paymentId: payment.id,
+      creditsAdded: payment.status === PaymentStatus.SUCCEEDED ? payment.credits_granted : undefined,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /payments/test-success/:reference
+ * DEV ONLY: Manually mark a payment as succeeded for testing
+ */
+router.get('/test-success/:reference', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    // SECURITY: Only allow in development
+    if (process.env.NODE_ENV === 'production') {
+      throw new UnauthorizedError('Test endpoint disabled in production');
+    }
+
+    const reference = req.params.reference;
+    const correlationId = req.correlationId;
+
+    const result = await processWebhookUpdate({
+      provider: PaymentProvider.PAYSTACK,
+      providerRef: reference,
+      status: 'succeeded',
+      rawEvent: { test: true },
+      correlationId,
+    });
+
+    res.json({
+      success: true,
+      message: 'Payment marked as succeeded (DEV ONLY)',
+      paymentId: result.paymentId,
+      creditsAdded: result.creditsAdded,
+    });
   } catch (error) {
     next(error);
   }

@@ -4,30 +4,67 @@
  */
 
 import express, { Express, Request, Response } from 'express';
+import cors from 'cors';
 
 import { logger } from './logger.js';
+import { authMiddleware } from './middleware/auth.js';
 import { correlationMiddleware } from './middleware/correlation.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import adminConfigRoutes from './routes/admin/config.js';
 import adminCreditsRoutes from './routes/admin/credits.js';
+import adminDashboardRoutes from './routes/admin/dashboard.js';
 import adminDlqRoutes from './routes/admin/dlq.js';
+import adminFinopsRoutes from './routes/admin/finops.js';
+import adminJobsRoutes from './routes/admin/jobs.js';
+import adminPricingRoutes from './routes/admin/pricing.js';
+import adminQueueRoutes from './routes/admin/queue.js';
 import adminReportsRoutes from './routes/admin/reports.js';
+import adminTicketsRoutes from './routes/admin/tickets.js';
+import adminUsersRoutes from './routes/admin/users.js';
 import authRoutes from './routes/auth.js';
 import contentRoutes from './routes/content.js';
 import devRoutes from './routes/dev.js';
 import jobsRoutes from './routes/jobs.js';
+import mannequinsRoutes from './routes/mannequins.js';
 import meRoutes from './routes/me.js';
 import paymentsRoutes from './routes/payments.js';
 import termsRoutes from './routes/terms.js';
+import voiceRoutes from './routes/voice.js';
 
 export function createApp(): Express {
   const app = express();
 
-  // Body parsing
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  // CORS configuration for PWA development
+  app.use(cors({
+    origin: [
+      'http://localhost:3001',
+      'http://localhost:3003',
+      'http://localhost:3004',
+      'http://localhost:8081',
+      'http://localhost:8082',
+      'http://192.168.0.24:3001',
+      'http://192.168.0.24:3003',
+      'http://192.168.0.24:3004',
+      'http://192.168.0.24:8081',
+      'http://192.168.0.24:8082',
+    ],
+    credentials: true,
+  }));
+
+  // Body parsing - 50mb to support base64 image uploads (~37MB image = ~50MB base64)
+  app.use(express.json({
+    limit: '50mb',
+    verify: (req, _res, buf) => {
+      (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+    },
+  }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // Correlation ID middleware
   app.use(correlationMiddleware);
+
+  // Authentication middleware (populates req.user from Supabase token)
+  app.use(authMiddleware);
 
   // Request logging
   app.use((req: Request, res: Response, next) => {
@@ -64,10 +101,20 @@ export function createApp(): Express {
   app.use('/me', meRoutes);
   app.use('/terms', termsRoutes);
   app.use('/jobs', jobsRoutes);
+  app.use('/mannequins', mannequinsRoutes);
   app.use('/payments', paymentsRoutes);
+  app.use('/admin/config', adminConfigRoutes);
   app.use('/admin/credits', adminCreditsRoutes);
+  app.use('/admin/dashboard', adminDashboardRoutes);
   app.use('/admin/dlq', adminDlqRoutes);
+  app.use('/admin/finops', adminFinopsRoutes);
+  app.use('/admin/jobs', adminJobsRoutes);
+  app.use('/admin/pricing', adminPricingRoutes);
+  app.use('/admin/queue', adminQueueRoutes);
   app.use('/admin/reports', adminReportsRoutes);
+  app.use('/admin/tickets', adminTicketsRoutes);
+  app.use('/admin/users', adminUsersRoutes);
+  app.use('/voice', voiceRoutes);
   app.use('/content', contentRoutes);
   app.use('/dev', devRoutes);
 

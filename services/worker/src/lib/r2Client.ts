@@ -169,10 +169,13 @@ export async function uploadGalleryImage(
       meta: { bucket, key },
     });
 
+    // Generate public URL - use configured URL or construct default R2.dev URL
+    const publicUrl = config.publicUrl || `https://pub-${config.accountId}.r2.dev`;
+
     return {
       bucket,
       key,
-      url: `${config.publicUrl || ''}/${key}`,
+      url: `${publicUrl}/${key}`,
     };
   } catch (error) {
     logger.error('Failed to upload gallery image to R2', {
@@ -222,10 +225,13 @@ export async function uploadThumbnail(
       meta: { bucket, key, size },
     });
 
+    // Generate public URL - use configured URL or construct default R2.dev URL
+    const publicUrl = config.publicUrl || `https://pub-${config.accountId}.r2.dev`;
+
     return {
       bucket,
       key,
-      url: `${config.publicUrl || ''}/${key}`,
+      url: `${publicUrl}/${key}`,
     };
   } catch (error) {
     logger.error('Failed to upload thumbnail to R2', {
@@ -239,13 +245,13 @@ export async function uploadThumbnail(
 }
 
 /**
- * Download object from R2
+ * Download object from R2 as Buffer
  */
 export async function downloadObject(
   bucket: string,
   key: string,
   correlationId?: string
-): Promise<{ body: ReadableStream | null; contentType: string | undefined; metadata: Record<string, string> }> {
+): Promise<{ body: Buffer | null; contentType: string | undefined; metadata: Record<string, string> }> {
   const { client } = getClient();
 
   const input: GetObjectCommandInput = {
@@ -258,15 +264,22 @@ export async function downloadObject(
   try {
     const response = await client.send(new GetObjectCommand(input));
 
+    // Convert stream to Buffer
+    let bodyBuffer: Buffer | null = null;
+    if (response.Body) {
+      const byteArray = await response.Body.transformToByteArray();
+      bodyBuffer = Buffer.from(byteArray);
+    }
+
     logger.info('Object downloaded from R2', {
       action: 'r2_download',
       correlation_id: correlationId,
       duration_ms: Date.now() - startTime,
-      meta: { bucket, key },
+      meta: { bucket, key, size: bodyBuffer?.length },
     });
 
     return {
-      body: response.Body as ReadableStream | null,
+      body: bodyBuffer,
       contentType: response.ContentType,
       metadata: (response.Metadata as Record<string, string>) || {},
     };

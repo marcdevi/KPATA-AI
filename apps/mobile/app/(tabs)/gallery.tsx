@@ -9,7 +9,6 @@ import { router } from 'expo-router';
 import { useJobStore } from '../../src/store/job';
 import { getJobs } from '../../src/services/api';
 import { JOB_STATUS_LABELS } from '../../src/constants/options';
-import { API_CONFIG } from '../../src/config/api';
 
 export default function GalleryScreen() {
   const { jobs, isLoadingJobs, setJobs, setLoadingJobs } = useJobStore();
@@ -29,7 +28,7 @@ export default function GalleryScreen() {
         mannequinMode: 'none',
         createdAt: j.created_at,
         completedAt: j.completed_at,
-        thumbnailUrl: `${API_CONFIG.mediaWorkerUrl}/gallery/${j.id}/thumb_256.webp`,
+        thumbnailUrl: j.thumbnail_url || undefined,
       })));
     }
   }, [setJobs, setLoadingJobs]);
@@ -40,17 +39,27 @@ export default function GalleryScreen() {
 
   const renderJob = ({ item }: { item: typeof jobs[0] }) => {
     const status = JOB_STATUS_LABELS[item.status] || { label: item.status, color: '#666' };
+    
+    console.log(`[Gallery] Job ${item.id.substring(0, 8)} - Status: ${item.status}, Thumbnail: ${item.thumbnailUrl || 'none'}`);
 
     return (
       <TouchableOpacity
         style={styles.jobCard}
-        onPress={() => router.push(`/job/${item.id}`)}
+        onPress={() => router.push(`/result/${item.id}`)}
       >
-        <Image
-          source={{ uri: item.thumbnailUrl }}
-          style={styles.thumbnail}
-          
-        />
+        {item.thumbnailUrl ? (
+          <Image
+            source={{ uri: item.thumbnailUrl }}
+            style={styles.thumbnail}
+            onError={(e) => console.log(`[Gallery] Image load error for ${item.id}:`, e.nativeEvent.error)}
+          />
+        ) : (
+          <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+            <Text style={styles.placeholderIcon}>
+              {item.status === 'completed' ? '🖼️' : '⏳'}
+            </Text>
+          </View>
+        )}
         <View style={styles.jobInfo}>
           <Text style={styles.jobCategory}>{item.category}</Text>
           <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
@@ -92,6 +101,8 @@ const styles = StyleSheet.create({
   list: { padding: 8 },
   jobCard: { flex: 1, margin: 8, backgroundColor: '#F9FAFB', borderRadius: 12, overflow: 'hidden' },
   thumbnail: { width: '100%', aspectRatio: 1, backgroundColor: '#E5E7EB' },
+  thumbnailPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  placeholderIcon: { fontSize: 32, opacity: 0.5 },
   jobInfo: { padding: 8 },
   jobCategory: { fontSize: 12, fontWeight: '600', color: '#1F2937', textTransform: 'capitalize' },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4 },

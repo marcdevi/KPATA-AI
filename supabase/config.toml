@@ -1,6 +1,8 @@
 # Supabase configuration for KPATA AI
 # See: https://supabase.com/docs/guides/cli/config
 
+ project_id = "iulzrtesmkumykohinco"
+
 [api]
 enabled = true
 port = 54321
@@ -11,7 +13,7 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 17
+major_version = 15
 
 [studio]
 enabled = true

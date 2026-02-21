@@ -44,8 +44,8 @@ interface JobState {
 
 const DEFAULT_OPTIONS: JobOptions = {
   category: 'clothing',
-  backgroundStyle: 'studio_clean_white',
-  templateLayout: 'A',
+  backgroundStyle: 'studio_white',
+  templateLayout: 'square_1x1',
   mannequinMode: 'none',
 };
 

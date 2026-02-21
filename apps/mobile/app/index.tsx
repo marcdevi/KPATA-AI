@@ -19,7 +19,7 @@ export default function Index() {
   }
 
   if (!isAuthenticated) {
-    return <Redirect href="/(auth)/phone" />;
+    return <Redirect href="/(auth)/email" />;
   }
 
   if (!hasAcceptedTerms) {

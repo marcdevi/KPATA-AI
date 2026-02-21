@@ -4,7 +4,13 @@
     "slug": "kpata-ai",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#10b981"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -25,7 +31,19 @@
       ]
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "jsEngine": "jsc",
+      "name": "KPATA AI",
+      "shortName": "KPATA",
+      "lang": "fr",
+      "themeColor": "#10b981",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "scope": "/"
     },
     "scheme": "kpata",
     "plugins": [

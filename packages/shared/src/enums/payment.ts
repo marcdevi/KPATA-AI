@@ -10,4 +10,5 @@ export enum PaymentProvider {
   MTN_MONEY = 'mtn_money',
   WAVE = 'wave',
   MOOV_MONEY = 'moov_money',
+  PAYSTACK = 'paystack',
 }

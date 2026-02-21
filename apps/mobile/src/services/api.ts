@@ -17,14 +17,21 @@ async function request<T>(
   endpoint: string,
   body?: unknown
 ): Promise<ApiResponse<T>> {
-  const { profileId } = useAuthStore.getState();
+  const { token } = useAuthStore.getState();
+
+  const url = `${API_CONFIG.baseUrl}${endpoint}`;
+
+  console.log('[API] Request:', method, endpoint, 'URL:', url, 'Token:', token ? 'present' : 'missing');
+  if (body && endpoint === '/jobs') {
+    console.log('[API] Job creation body:', JSON.stringify(body, null, 2));
+  }
 
   try {
-    const response = await fetch(`${API_CONFIG.baseUrl}${endpoint}`, {
+    const response = await fetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
-        ...(profileId ? { 'x-profile-id': profileId } : {}),
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -32,12 +39,19 @@ async function request<T>(
     const data = await response.json();
 
     if (!response.ok) {
+      console.log('[API] Error response:', JSON.stringify(data, null, 2));
       return { error: data.error || { message: 'Unknown error', code: 'UNKNOWN' } };
     }
 
     return { data };
   } catch (error) {
-    return { error: { message: String(error), code: 'NETWORK_ERROR' } };
+    console.log('[API] Network error:', error);
+    return {
+      error: {
+        message: `Network request failed (${method} ${url})`,
+        code: 'NETWORK_ERROR',
+      },
+    };
   }
 }
 
@@ -58,12 +72,31 @@ export async function linkPhone(phoneE164: string) {
   return request<{ profile: { id: string }; isNew: boolean }>('POST', ENDPOINTS.phoneLink, { phoneE164 });
 }
 
+export async function authBootstrap() {
+  return request<{ ok: boolean; profile: { id: string; email: string | null; role: string; termsAcceptedAt: string | null } }>(
+    'POST',
+    ENDPOINTS.authBootstrap
+  );
+}
+
 // Profile
 export async function getProfile() {
   return request<{
-    profile: { id: string; phone_e164: string };
+    profile: {
+      id: string;
+      phone: string | null;
+      email: string | null;
+      role: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+      termsAcceptedAt: string | null;
+      termsVersion: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
     credits: { balance: number };
-    plan: { role: string; capabilities: string[] };
+    plan: { id: string; name: string };
+    capabilities: string[];
   }>('GET', ENDPOINTS.me);
 }
 
@@ -78,6 +111,7 @@ export async function createJob(options: {
   templateLayout: string;
   mannequinMode: string;
   clientRequestId?: string;
+  imageBase64?: string;
 }) {
   return request<{ job: { id: string }; creditsRemaining: number; wasCreated: boolean }>(
     'POST',
@@ -99,13 +133,35 @@ export async function getJobs(limit = 20, offset = 0) {
       template_layout: string;
       created_at: string;
       completed_at?: string;
+      thumbnail_url?: string | null;
     }>;
     pagination: { total: number; limit: number; offset: number };
   }>('GET', `${ENDPOINTS.jobs}?limit=${limit}&offset=${offset}`);
 }
 
 export async function getJob(jobId: string) {
-  return request<{ job: { id: string; status: string } }>('GET', ENDPOINTS.jobById(jobId));
+  return request<{
+    job: {
+      id: string;
+      status: string;
+      category: string;
+      background_style: string;
+      template_layout: string;
+      created_at: string;
+      completed_at?: string;
+    };
+    assets: Array<{
+      id: string;
+      type: string;
+      width: number;
+      height: number;
+      metadata?: {
+        format?: string;
+        variant?: string;
+        url?: string;
+      };
+    }>;
+  }>('GET', ENDPOINTS.jobById(jobId));
 }
 
 // Payments
@@ -113,6 +169,7 @@ export async function getCreditPacks() {
   return request<{
     packs: Array<{
       id: string;
+      code: string;
       name: string;
       credits: number;
       price_xof: number;
@@ -121,11 +178,18 @@ export async function getCreditPacks() {
   }>('GET', ENDPOINTS.packs);
 }
 
-export async function initPayment(packId: string, provider: 'orange_money' | 'mtn_momo' | 'wave') {
-  return request<{ payment: { id: string }; redirectUrl?: string }>('POST', ENDPOINTS.paymentInit, {
-    packId,
+export async function initPayment(packCode: string, provider: 'orange_money' | 'mtn_momo' | 'wave' | 'paystack') {
+  return request<{ payment: { id: string; providerRef: string }; redirectUrl?: string }>('POST', ENDPOINTS.paymentInit, {
+    packCode,
     provider,
   });
+}
+
+export async function verifyPaystack(reference: string) {
+  return request<{ ok: boolean; status: string; paymentId: string; creditsAdded?: number }>(
+    'GET',
+    `/payments/verify/${encodeURIComponent(reference)}`
+  );
 }
 
 // Content
@@ -137,6 +201,36 @@ export async function reportContent(data: {
   description?: string;
 }) {
   return request<{ report: { id: string } }>('POST', ENDPOINTS.report, data);
+}
+
+// Mannequins
+export async function createMannequin(data: {
+  faceImageBase64: string;
+  bodyImageBase64: string;
+  isCelebrityConfirmed: boolean;
+}) {
+  return request<{ mannequin: { id: string; faceImageUrl: string; bodyImageUrl: string } }>(
+    'POST',
+    ENDPOINTS.mannequins,
+    data
+  );
+}
+
+export async function getMannequin() {
+  return request<{
+    mannequin: {
+      id: string;
+      faceImageUrl: string;
+      bodyImageUrl: string;
+      status: string;
+      createdAt: string;
+      updatedAt: string;
+    } | null;
+  }>('GET', ENDPOINTS.mannequinMe);
+}
+
+export async function deleteMannequin() {
+  return request<{ deleted: boolean }>('DELETE', ENDPOINTS.mannequinMe);
 }
 
 // Support

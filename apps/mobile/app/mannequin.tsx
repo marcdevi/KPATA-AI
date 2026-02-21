@@ -3,15 +3,38 @@
  * Upload mannequin face+body + checkbox "no celebrity"
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Alert, Switch } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { File } from 'expo-file-system';
+import { createMannequin, getMannequin } from '../src/services/api';
 
 export default function MannequinScreen() {
   const [faceImage, setFaceImage] = useState<string | null>(null);
   const [bodyImage, setBodyImage] = useState<string | null>(null);
   const [notCelebrity, setNotCelebrity] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load existing mannequin on mount
+  useEffect(() => {
+    loadMannequin();
+  }, []);
+
+  const loadMannequin = async () => {
+    try {
+      const result = await getMannequin();
+      if (result.data?.mannequin) {
+        setFaceImage(result.data.mannequin.faceImageUrl);
+        setBodyImage(result.data.mannequin.bodyImageUrl);
+        setNotCelebrity(true);
+      }
+    } catch (error) {
+      console.error('Failed to load mannequin:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const pickImage = async (type: 'face' | 'body') => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -42,11 +65,36 @@ export default function MannequinScreen() {
     }
 
     setIsSaving(true);
-    // TODO: Upload to API
-    setTimeout(() => {
+    
+    try {
+      // Convert images to base64
+      const faceFile = new File(faceImage);
+      const faceBase64 = await faceFile.base64();
+      
+      const bodyFile = new File(bodyImage);
+      const bodyBase64 = await bodyFile.base64();
+
+      // Upload to API
+      const result = await createMannequin({
+        faceImageBase64: faceBase64,
+        bodyImageBase64: bodyBase64,
+        isCelebrityConfirmed: notCelebrity,
+      });
+
+      if (result.error) {
+        Alert.alert('Erreur', result.error.message || 'Impossible d\'enregistrer le mannequin.');
+        return;
+      }
+
+      Alert.alert('Succès', 'Ton mannequin a été enregistré ! Tu peux maintenant l\'utiliser pour générer tes visuels.');
+      // Reload to show saved images
+      await loadMannequin();
+    } catch (error) {
+      console.error('Mannequin save error:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'enregistrement.');
+    } finally {
       setIsSaving(false);
-      Alert.alert('Succès', 'Ton mannequin a été enregistré !');
-    }, 1500);
+    }
   };
 
   return (

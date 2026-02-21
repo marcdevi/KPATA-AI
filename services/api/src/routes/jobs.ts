@@ -32,6 +32,7 @@ const createJobSchema = z.object({
   templateLayout: z.nativeEnum(TemplateLayout).optional().default(TemplateLayout.SQUARE_1X1),
   mannequinMode: z.nativeEnum(MannequinMode).optional().default(MannequinMode.NONE),
   imageBase64: z.string().optional(), // For NSFW pre-check
+  prompt: z.string().optional(), // Custom prompt (e.g. from voice input)
 });
 
 router.post(
@@ -42,6 +43,16 @@ router.post(
       if (!req.user) {
         throw new UnauthorizedError('Authentication required');
       }
+
+      logger.debug('Create job request body', {
+        action: 'create_job_request',
+        correlation_id: req.correlationId,
+        meta: { 
+          body: req.body,
+          mannequinMode: req.body.mannequinMode,
+          mannequinModeType: typeof req.body.mannequinMode,
+        },
+      });
 
       const input = validateBody(createJobSchema, req.body);
       const correlationId = req.correlationId;
@@ -200,6 +211,42 @@ router.post(
         ? 'high'
         : 'low';
 
+      // Fetch mannequin images if custom mode is selected
+      let mannequinFaceBucket: string | undefined;
+      let mannequinFaceKey: string | undefined;
+      let mannequinBodyBucket: string | undefined;
+      let mannequinBodyKey: string | undefined;
+      
+      if (input.mannequinMode === MannequinMode.CUSTOM) {
+        const { data: mannequin } = await supabase
+          .from('mannequins')
+          .select('face_image_bucket, face_image_key, body_image_bucket, body_image_key')
+          .eq('profile_id', userId)
+          .eq('status', 'active')
+          .single();
+        
+        if (mannequin) {
+          mannequinFaceBucket = mannequin.face_image_bucket;
+          mannequinFaceKey = mannequin.face_image_key;
+          mannequinBodyBucket = mannequin.body_image_bucket;
+          mannequinBodyKey = mannequin.body_image_key;
+          
+          logger.info('Mannequin images fetched for job', {
+            action: 'mannequin_fetched',
+            correlation_id: correlationId,
+            user_id: userId,
+            meta: { jobId: result.job_id, hasFace: !!mannequinFaceKey, hasBody: !!mannequinBodyKey },
+          });
+        } else {
+          logger.warn('Custom mannequin mode selected but no mannequin found', {
+            action: 'mannequin_missing',
+            correlation_id: correlationId,
+            user_id: userId,
+            meta: { jobId: result.job_id },
+          });
+        }
+      }
+
       // Publish to queue for processing
       await publishJob({
         jobId: result.job_id,
@@ -211,13 +258,12 @@ router.post(
         templateLayout: input.templateLayout,
         mannequinMode: input.mannequinMode,
         sourceChannel: input.sourceChannel,
-      });
-
-      logger.info('Job published to queue', {
-        action: 'job_queue_published',
-        correlation_id: correlationId,
-        user_id: userId,
-        meta: { jobId: result.job_id, priority },
+        inputImageBase64: input.imageBase64,
+        customPrompt: input.prompt,
+        mannequinFaceBucket,
+        mannequinFaceKey,
+        mannequinBodyBucket,
+        mannequinBodyKey,
       });
 
       res.status(201).json({
@@ -267,8 +313,32 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       throw error;
     }
 
+    // Fetch thumbnail URLs for completed jobs
+    const jobsWithThumbnails = await Promise.all(
+      (jobs || []).map(async (job) => {
+        if (job.status === 'completed') {
+          const { data: assets } = await supabase
+            .from('assets')
+            .select('metadata')
+            .eq('job_id', job.id)
+            .eq('type', 'output_image')
+            .order('created_at', { ascending: true })
+            .limit(1);
+          
+          return {
+            ...job,
+            thumbnail_url: assets?.[0]?.metadata?.url || null,
+          };
+        }
+        return {
+          ...job,
+          thumbnail_url: null,
+        };
+      })
+    );
+
     res.json({
-      jobs: jobs || [],
+      jobs: jobsWithThumbnails,
       pagination: {
         total: count || 0,
         limit,
@@ -303,7 +373,19 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction): Prom
       throw new ConflictError('Job not found');
     }
 
-    res.json({ job });
+    // Fetch associated assets
+    const { data: assets } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('job_id', req.params.id)
+      .order('created_at', { ascending: false });
+
+    // Disable caching for polling - job status and assets change frequently
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    
+    res.json({ job, assets: assets || [] });
   } catch (error) {
     next(error);
   }

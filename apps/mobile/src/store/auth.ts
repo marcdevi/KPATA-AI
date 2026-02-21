@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../utils/storage';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -17,7 +17,7 @@ interface AuthState {
   token: string | null;
   
   // Actions
-  setAuth: (data: { profileId: string; phoneE164: string; role: string; hasAcceptedTerms: boolean; token?: string }) => void;
+  setAuth: (data: { profileId: string | null; phoneE164: string | null; role: string | null; hasAcceptedTerms: boolean; token?: string | null }) => void;
   setCredits: (credits: number) => void;
   setTermsAccepted: (accepted: boolean) => void;
   logout: () => void;

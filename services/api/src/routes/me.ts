@@ -39,7 +39,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
 
     // Get credit balance
     const { data: balanceData, error: balanceError } = await supabase
-      .rpc('get_credit_balance', { p_user_id: req.user.id });
+      .rpc('get_credit_balance', { p_profile_id: req.user.id });
 
     const creditBalance = balanceError ? 0 : (balanceData || 0);
 
@@ -57,10 +57,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
     res.json({
       profile: {
         id: profile.id,
-        phone: profile.phone,
+        phone: profile.phone_e164 || profile.phone || null,
+        email: profile.email || null,
         role: profile.role,
-        displayName: profile.display_name,
-        avatarUrl: profile.avatar_url,
+        displayName: profile.name || profile.display_name || null,
+        avatarUrl: profile.avatar_url || null,
         termsAcceptedAt: profile.terms_accepted_at,
         termsVersion: profile.terms_version,
         createdAt: profile.created_at,

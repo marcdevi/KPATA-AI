@@ -12,21 +12,23 @@ export const CATEGORIES = [
 ] as const;
 
 export const BACKGROUNDS = [
-  { id: 'studio_clean_white', label: 'Blanc Studio', icon: '⬜' },
-  { id: 'luxury_marble_velvet', label: 'Luxe Marbre', icon: '✨' },
-  { id: 'boutique_clean_store', label: 'Boutique', icon: '🏪' },
+  { id: 'studio_white', label: 'Blanc Studio', icon: '⬜' },
+  { id: 'studio_gray', label: 'Gris Studio', icon: '◻️' },
+  { id: 'gradient_soft', label: 'Dégradé Doux', icon: '🌈' },
+  { id: 'outdoor_street', label: 'Rue', icon: '🏙️' },
+  { id: 'lifestyle_cafe', label: 'Café', icon: '☕' },
 ] as const;
 
 export const TEMPLATES = [
-  { id: 'A', label: 'Template A', description: 'Produit centré, prix en bas' },
-  { id: 'B', label: 'Template B', description: 'Produit en haut, infos centrées' },
-  { id: 'C', label: 'Template C', description: 'Style moderne asymétrique' },
+  { id: 'square_1x1', label: 'Carré 1:1', description: 'Format carré pour Instagram' },
+  { id: 'portrait_4x5', label: 'Portrait 4:5', description: 'Format portrait pour feed' },
+  { id: 'story_9x16', label: 'Story 9:16', description: 'Format vertical pour stories' },
 ] as const;
 
 export const MANNEQUINS = [
   { id: 'none', label: 'Aucun', icon: '❌' },
   { id: 'ghost_mannequin', label: 'Mannequin Fantôme', icon: '👻' },
-  { id: 'user_mannequin', label: 'Mon Mannequin', icon: '👤' },
+  { id: 'custom', label: 'Mon Mannequin', icon: '👤' },
   { id: 'virtual_model_female', label: 'Modèle Femme', icon: '👩' },
   { id: 'virtual_model_male', label: 'Modèle Homme', icon: '👨' },
 ] as const;

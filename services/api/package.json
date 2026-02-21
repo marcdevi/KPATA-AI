@@ -6,7 +6,7 @@
   "main": "./dist/server.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/server.ts",
+    "dev": "pnpm --filter @kpata/shared build && tsx watch src/server.ts",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist",
@@ -18,10 +18,13 @@
     "@kpata/shared": "workspace:*",
     "@nsfw-filter/nsfwjs": "^2.2.0",
     "@supabase/supabase-js": "^2.91.0",
-    "@tensorflow/tfjs-node": "^4.22.0",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@types/cors": "^2.8.19",
     "bullmq": "^5.66.7",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "ioredis": "^5.9.2",
+    "jimp": "^1.1.4",
     "jsonwebtoken": "^9.0.2",
     "zod": "^4.3.6"
   },

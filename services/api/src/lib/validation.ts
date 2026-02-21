@@ -17,7 +17,9 @@ export function validateBody<T>(schema: ZodSchema<T>, data: unknown): T {
       const details = error.issues.map((e: ZodIssue) => ({
         path: e.path.join('.'),
         message: e.message,
+        received: e.code === 'invalid_type' ? (e as any).received : undefined,
       }));
+      console.error('Validation error details:', JSON.stringify(details, null, 2));
       throw new BadRequestError('Validation failed', { errors: details });
     }
     throw error;

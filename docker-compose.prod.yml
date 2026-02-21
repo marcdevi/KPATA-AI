@@ -1,0 +1,139 @@
+# Production Docker Compose Configuration for KPATA AI
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  # Redis for BullMQ queues and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: kpata-redis-prod
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind to localhost only
+    volumes:
+      - redis_data_prod:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-changeme}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kpata-network-prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # API Service (Express)
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: production
+    container_name: kpata-api-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+    env_file:
+      - services/api/.env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - kpata-network-prod
+    restart: always
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Worker Service (BullMQ)
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+      target: production
+    container_name: kpata-worker-prod
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+    env_file:
+      - services/worker/.env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - kpata-network-prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+      replicas: 1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Telegram Bot (optional)
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: services/telegram-bot/Dockerfile
+      target: production
+    container_name: kpata-telegram-bot-prod
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - API_BASE_URL=http://api:3000
+    env_file:
+      - services/telegram-bot/.env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - kpata-network-prod
+    restart: always
+    profiles:
+      - with-bot
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  redis_data_prod:
+    driver: local
+
+networks:
+  kpata-network-prod:
+    driver: bridge

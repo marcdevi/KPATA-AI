@@ -26,6 +26,7 @@ export const PERMISSIONS = {
   JOBS_VIEW: 'jobs:view',
   JOBS_CANCEL: 'jobs:cancel',
   JOBS_RETRY: 'jobs:retry',
+  JOBS_MANAGE: 'jobs:manage',
 
   // Support
   TICKETS_VIEW: 'tickets:view',
@@ -38,6 +39,21 @@ export const PERMISSIONS = {
   ADMIN_CONFIG_VIEW: 'admin:config:view',
   ADMIN_CONFIG_EDIT: 'admin:config:edit',
   ADMIN_ROLES_MANAGE: 'admin:roles:manage',
+
+  // Reports & Dashboard
+  REPORTS_VIEW: 'reports:view',
+
+  // Queue management
+  QUEUE_VIEW: 'queue:view',
+  QUEUE_MANAGE: 'queue:manage',
+
+  // Pricing management
+  PRICING_VIEW: 'pricing:view',
+  PRICING_EDIT: 'pricing:edit',
+
+  // Config (used by config.ts and pricing.ts routes)
+  CONFIG_VIEW: 'config:view',
+  CONFIG_EDIT: 'config:edit',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -68,12 +84,18 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.JOBS_VIEW,
     PERMISSIONS.JOBS_CANCEL,
     PERMISSIONS.JOBS_RETRY,
+    PERMISSIONS.JOBS_MANAGE,
     PERMISSIONS.TICKETS_VIEW,
     PERMISSIONS.TICKETS_RESPOND,
     PERMISSIONS.TICKETS_CLOSE,
     PERMISSIONS.TICKETS_MANAGE,
     PERMISSIONS.ADMIN_AUDIT_VIEW,
     PERMISSIONS.ADMIN_CONFIG_VIEW,
+    PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.QUEUE_VIEW,
+    PERMISSIONS.QUEUE_MANAGE,
+    PERMISSIONS.PRICING_VIEW,
+    PERMISSIONS.CONFIG_VIEW,
   ],
   [UserRole.SUPER_ADMIN]: Object.values(PERMISSIONS),
 };
@@ -86,6 +108,8 @@ declare global {
         id: string;
         role: UserRole;
         phone: string;
+        email?: string | null;
+        hasProfile?: boolean;
       };
     }
   }

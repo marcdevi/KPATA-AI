@@ -11,6 +11,9 @@ COPY pnpm-workspace.yaml ./
 COPY package.json ./
 COPY pnpm-lock.yaml ./
 
+# Copy root TypeScript config (used by workspace packages via extends)
+COPY tsconfig.base.json ./
+
 # Copy shared package
 COPY packages/shared ./packages/shared
 

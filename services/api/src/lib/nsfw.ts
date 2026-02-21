@@ -4,7 +4,8 @@
  */
 
 import * as nsfwjs from '@nsfw-filter/nsfwjs';
-import * as tf from '@tensorflow/tfjs-node';
+import * as tf from '@tensorflow/tfjs';
+import { Jimp } from 'jimp';
 
 let model: nsfwjs.NSFWJS | null = null;
 let modelLoading: Promise<nsfwjs.NSFWJS> | null = null;
@@ -52,11 +53,25 @@ async function loadModel(): Promise<nsfwjs.NSFWJS> {
 export async function checkNSFW(imageBuffer: Buffer): Promise<NSFWCheckResult> {
   const nsfwModel = await loadModel();
 
-  // Decode image to tensor
+  // Decode image to tensor using Jimp (pure JS, no native deps)
   let imageTensor: tf.Tensor3D;
   try {
-    imageTensor = tf.node.decodeImage(imageBuffer, 3) as tf.Tensor3D;
-  } catch (error) {
+    const image = await Jimp.read(imageBuffer);
+    const { width, height } = image.bitmap;
+    const pixels = new Uint8Array(width * height * 3);
+    
+    let idx = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = image.getPixelColor(x, y);
+        pixels[idx++] = (color >> 24) & 0xff; // R
+        pixels[idx++] = (color >> 16) & 0xff; // G
+        pixels[idx++] = (color >> 8) & 0xff;  // B
+      }
+    }
+    
+    imageTensor = tf.tensor3d(pixels, [height, width, 3], 'int32') as tf.Tensor3D;
+  } catch (_error) {
     throw new Error('Failed to decode image for NSFW check');
   }
 

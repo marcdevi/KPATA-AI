@@ -58,6 +58,12 @@ export interface JobPayload {
   templateLayout: string;
   mannequinMode: string;
   sourceChannel: string;
+  inputImageBase64?: string; // Optional uploaded image
+  customPrompt?: string; // Optional voice/custom prompt
+  mannequinFaceBucket?: string;
+  mannequinFaceKey?: string;
+  mannequinBodyBucket?: string;
+  mannequinBodyKey?: string;
 }
 
 /**

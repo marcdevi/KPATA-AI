@@ -16,7 +16,7 @@ const router: Router = Router();
 
 const DEV_PHONE = '+225000000000';
 const DEV_TERMS_VERSION = 'dev';
-const DEV_MIN_CREDITS = 50;
+const DEV_MIN_CREDITS = 500;
 
 /**
  * Check if dev auth is enabled
@@ -57,7 +57,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
     let { data: profile, error: findError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('phone', DEV_PHONE)
+      .eq('phone_e164', DEV_PHONE)
       .single();
 
     if (findError && findError.code !== 'PGRST116') {
@@ -69,11 +69,10 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
         .insert({
-          phone: DEV_PHONE,
-          display_name: 'Dev Guest',
+          phone_e164: DEV_PHONE,
+          name: 'Dev Guest',
           role: UserRole.USER_FREE,
           status: 'active',
-          source_channel: 'app',
           terms_accepted_at: new Date().toISOString(),
           terms_version: DEV_TERMS_VERSION,
         })
@@ -127,11 +126,14 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
 
       await supabase.from('credit_ledger').insert({
         profile_id: profile.id,
+        entry_type: 'bonus',
         amount: topUpAmount,
-        reason: 'bonus',
         description: 'Dev guest bonus credits',
-        reference_type: 'dev_login',
-        reference_id: correlationId,
+        idempotency_key: `dev_login_${profile.id}_${Date.now()}`,
+        metadata: {
+          source: 'dev_login',
+          correlation_id: correlationId,
+        },
       });
 
       logger.info('Dev credits topped up', {
@@ -164,9 +166,9 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
       token,
       profile: {
         id: profile.id,
-        phone: profile.phone,
+        phone: profile.phone_e164,
         role: profile.role,
-        displayName: profile.display_name,
+        displayName: profile.name || 'Dev Guest',
         termsAcceptedAt: profile.terms_accepted_at,
         termsVersion: profile.terms_version,
         createdAt: profile.created_at,

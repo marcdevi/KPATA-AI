@@ -1,0 +1,8 @@
+{
+  "/profile/page": "app/profile/page.js",
+  "/credits/page": "app/credits/page.js",
+  "/payment-callback/page": "app/payment-callback/page.js",
+  "/page": "app/page.js",
+  "/home/page": "app/home/page.js",
+  "/login/page": "app/login/page.js"
+}

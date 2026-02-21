@@ -4,8 +4,8 @@
  */
 
 export const QUEUE_NAMES = {
-  JOBS: 'kpata:jobs',
-  NOTIFICATIONS: 'kpata:notifications',
+  JOBS: 'kpata-jobs',
+  NOTIFICATIONS: 'kpata-notifications',
 } as const;
 
 export const JOB_PRIORITIES = {

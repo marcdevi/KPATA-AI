@@ -9,11 +9,64 @@ import { z } from 'zod';
 
 import { normalizePhone } from '../lib/phone.js';
 import { getCapabilities } from '../lib/plans.js';
+import { UnauthorizedError } from '../lib/errors.js';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { validateBody } from '../lib/validation.js';
 import { logger } from '../logger.js';
 
 const router: Router = Router();
+
+/**
+ * POST /auth/bootstrap
+ * Ensure profile row exists for authenticated Supabase user (email auth)
+ */
+router.post('/bootstrap', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const correlationId = req.correlationId;
+    const supabase = getSupabaseClient();
+
+    // Upsert profile with id = auth.uid()
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: req.user.id,
+          email: req.user.email ?? null,
+          role: UserRole.USER_FREE,
+          status: 'active',
+        },
+        { onConflict: 'id' }
+      )
+      .select('*')
+      .single();
+
+    if (error || !profile) {
+      throw error || new Error('Failed to bootstrap profile');
+    }
+
+    logger.info('Profile bootstrapped', {
+      action: 'auth_bootstrap',
+      correlation_id: correlationId,
+      user_id: req.user.id,
+    });
+
+    res.json({
+      ok: true,
+      profile: {
+        id: profile.id,
+        email: profile.email ?? null,
+        role: profile.role,
+        termsAcceptedAt: profile.terms_accepted_at,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * POST /auth/phone/link
