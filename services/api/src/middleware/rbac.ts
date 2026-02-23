@@ -110,6 +110,7 @@ declare global {
         phone: string;
         email?: string | null;
         hasProfile?: boolean;
+        status?: string;
       };
     }
   }
