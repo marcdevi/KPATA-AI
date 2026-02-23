@@ -131,9 +131,9 @@ router.post(
         .from('ticket_messages')
         .insert({
           ticket_id: ticketId,
-          sender_type: 'agent',
-          sender_id: req.user.id,
+          sender_profile_id: req.user.id,
           content,
+          is_internal: false,
         })
         .select()
         .single();

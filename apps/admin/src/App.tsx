@@ -12,6 +12,7 @@ import UserDetailPage from './pages/UserDetailPage';
 import JobsPage from './pages/JobsPage';
 import QueuePage from './pages/QueuePage';
 import TicketsPage from './pages/TicketsPage';
+import ReportsPage from './pages/ReportsPage';
 import FinOpsPage from './pages/FinOpsPage';
 import ConfigPage from './pages/ConfigPage';
 import PricingPage from './pages/PricingPage';
@@ -38,6 +39,7 @@ function App() {
                   <Route path="/jobs" element={<JobsPage />} />
                   <Route path="/queue" element={<QueuePage />} />
                   <Route path="/tickets" element={<TicketsPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/finops" element={<FinOpsPage />} />
                   <Route path="/config" element={<ConfigPage />} />
                   <Route path="/pricing" element={<PricingPage />} />

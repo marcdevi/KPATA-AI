@@ -23,8 +23,9 @@ interface Ticket {
 
 interface TicketMessage {
   id: string;
-  sender_type: 'user' | 'agent';
+  sender_profile_id: string;
   content: string;
+  is_internal: boolean;
   created_at: string;
 }
 
@@ -157,21 +158,25 @@ export default function TicketsPage() {
               <CardContent>
                 {/* Messages */}
                 <div className="mb-4 max-h-96 space-y-3 overflow-y-auto">
-                  {messagesData?.messages?.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`rounded-lg p-3 ${
-                        msg.sender_type === 'agent'
-                          ? 'ml-8 bg-primary text-primary-foreground'
-                          : 'mr-8 bg-muted'
-                      }`}
-                    >
-                      <p>{msg.content}</p>
-                      <p className="mt-1 text-xs opacity-70">
-                        {formatDate(msg.created_at)}
-                      </p>
-                    </div>
-                  ))}
+                  {messagesData?.messages?.map((msg) => {
+                    const currentTicket = ticketsData?.tickets?.find(t => t.id === selectedTicket);
+                    const isAgent = msg.sender_profile_id !== currentTicket?.profile_id;
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`rounded-lg p-3 ${
+                          isAgent
+                            ? 'ml-8 bg-primary text-primary-foreground'
+                            : 'mr-8 bg-muted'
+                        }`}
+                      >
+                        <p>{msg.content}</p>
+                        <p className="mt-1 text-xs opacity-70">
+                          {formatDate(msg.created_at)}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Macros */}

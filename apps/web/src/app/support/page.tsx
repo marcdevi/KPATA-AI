@@ -31,7 +31,7 @@ export default function SupportPage() {
   const handleSubmitReport = async () => {
     if (!reportReason.trim()) { alert('Décris le problème.'); return; }
     setIsSubmitting(true);
-    const result = await reportContent({ jobId: reportJobId || undefined, reason: 'inappropriate_content', description: reportReason });
+    const result = await reportContent({ jobId: reportJobId || undefined, reason: 'other', description: reportReason });
     setIsSubmitting(false);
     if (result.error) { alert(result.error.message); return; }
     alert('Ton signalement a été envoyé. Merci !');
@@ -138,8 +138,8 @@ export default function SupportPage() {
 
         <div className="mt-8 bg-gray-50 rounded-xl p-4">
           <p className="text-sm font-bold text-gray-700 mb-2">Autres moyens de contact</p>
-          <p className="text-sm text-gray-500">📧 support@kpata.ai</p>
-          <p className="text-sm text-gray-500">📱 WhatsApp: +225 XX XX XX XX</p>
+          <p className="text-sm text-gray-500">📧 kpata-ai@proton.me</p>
+          <p className="text-sm text-gray-500">📱 WhatsApp: +225 07 19 43 57 75</p>
         </div>
       </div>
     </div>

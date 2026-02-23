@@ -28,6 +28,7 @@ import jobsRoutes from './routes/jobs.js';
 import mannequinsRoutes from './routes/mannequins.js';
 import meRoutes from './routes/me.js';
 import paymentsRoutes from './routes/payments.js';
+import supportRoutes from './routes/support.js';
 import termsRoutes from './routes/terms.js';
 import voiceRoutes from './routes/voice.js';
 
@@ -106,6 +107,7 @@ export function createApp(): Express {
   app.use('/jobs', jobsRoutes);
   app.use('/mannequins', mannequinsRoutes);
   app.use('/payments', paymentsRoutes);
+  app.use('/support', supportRoutes);
   app.use('/admin/config', adminConfigRoutes);
   app.use('/admin/credits', adminCreditsRoutes);
   app.use('/admin/dashboard', adminDashboardRoutes);

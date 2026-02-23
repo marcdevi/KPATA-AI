@@ -22,8 +22,6 @@ export default function ProfilePage() {
   const menuItems = [
     { icon: '👕', label: 'Mon Mannequin', href: '/mannequin' },
     { icon: '💬', label: 'Support', href: '/support' },
-    { icon: '📜', label: 'CGU', href: '#' },
-    { icon: '🔒', label: 'Confidentialité', href: '#' },
   ];
 
   if (authLoading) return <LoadingScreen />;
