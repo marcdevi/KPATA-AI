@@ -76,6 +76,41 @@ router.get(
 );
 
 /**
+ * GET /admin/users/pending
+ * List users with pending_approval status
+ */
+router.get(
+  '/pending',
+  requirePermission(PERMISSIONS.USERS_BAN),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      const supabase = getSupabaseClient();
+
+      const { data, count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .eq('status', 'pending_approval')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({
+        profiles: data || [],
+        total: count || 0,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /admin/users/:id
  * Get user profile 360° view
  */
@@ -250,41 +285,6 @@ router.post(
       });
 
       res.json({ profile });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * GET /admin/users/pending
- * List users with pending_approval status
- */
-router.get(
-  '/pending',
-  requirePermission(PERMISSIONS.USERS_BAN),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!req.user) {
-        throw new UnauthorizedError('Authentication required');
-      }
-
-      const supabase = getSupabaseClient();
-
-      const { data, count, error } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact' })
-        .eq('status', 'pending_approval')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      res.json({
-        profiles: data || [],
-        total: count || 0,
-      });
     } catch (error) {
       next(error);
     }

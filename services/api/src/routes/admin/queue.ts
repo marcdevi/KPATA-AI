@@ -182,7 +182,7 @@ router.post(
       const { jobId } = req.params;
       const supabase = getSupabaseClient();
 
-      // Update job status to cancelled
+      // Update job status to cancelled (allow cancelling queued or processing jobs)
       const { data, error } = await supabase
         .from('jobs')
         .update({
@@ -190,7 +190,7 @@ router.post(
           error_message: 'Cancelled by admin',
         })
         .eq('id', jobId)
-        .eq('status', 'queued')
+        .in('status', ['queued', 'processing'])
         .select()
         .single();
 

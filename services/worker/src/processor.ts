@@ -8,6 +8,7 @@ import sharp from 'sharp';
 
 import { handleDeadLetter } from './lib/dlq.js';
 import { generatePrompt, generateImage, generatePlaceholderImage } from './lib/openrouter.js';
+import { getPromptProfile, buildFullPrompt } from './pipeline/prompts.js';
 import { ProcessorContext, NonRetryableError, shouldRetry } from './lib/queue.js';
 import { uploadGalleryImage, uploadThumbnail, downloadObject } from './lib/r2Client.js';
 import { createStageTimer } from './lib/stage.js';
@@ -241,9 +242,20 @@ async function processWithAI(
   const state = processingStates.get(jobId);
   if (!state || !state.inputImageBuffer) throw new Error('Processing state not found');
 
-  // Use custom prompt if provided (e.g. from voice input), otherwise generate from category/style
-  const { prompt: generatedPrompt } = generatePrompt(category, backgroundStyle);
-  const prompt = customPrompt || generatedPrompt;
+  // Use DB-backed prompt profile if available, otherwise fall back to hardcoded
+  let prompt: string;
+  if (customPrompt) {
+    prompt = customPrompt;
+  } else {
+    try {
+      const profile = await getPromptProfile(backgroundStyle);
+      prompt = buildFullPrompt(profile.prompt, category);
+    } catch {
+      // Fallback to hardcoded prompts if DB is unavailable
+      const { prompt: generatedPrompt } = generatePrompt(category, backgroundStyle);
+      prompt = generatedPrompt;
+    }
+  }
 
   // Download mannequin images if provided
   let mannequinFaceBase64: string | undefined;

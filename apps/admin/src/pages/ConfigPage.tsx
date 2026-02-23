@@ -12,7 +12,9 @@ import { useAuthStore } from '../stores/auth';
 interface ModelRouting {
   id: string;
   category: string;
-  primary_model: string;
+  provider: string;
+  model: string;
+  fallback_provider: string;
   fallback_model: string;
   active: boolean;
 }
@@ -91,7 +93,8 @@ export default function ConfigPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-3 text-left text-sm font-medium">Catégorie</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Modèle principal</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Provider</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Modèle</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Fallback</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Statut</th>
                     {canEdit && <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>}
@@ -101,7 +104,8 @@ export default function ConfigPage() {
                   {data?.modelRouting?.map((routing) => (
                     <tr key={routing.id} className="border-b">
                       <td className="px-4 py-3">{routing.category}</td>
-                      <td className="px-4 py-3 font-mono text-sm">{routing.primary_model}</td>
+                      <td className="px-4 py-3 font-mono text-sm">{routing.provider}</td>
+                      <td className="px-4 py-3 font-mono text-sm">{routing.model}</td>
                       <td className="px-4 py-3 font-mono text-sm">{routing.fallback_model}</td>
                       <td className="px-4 py-3">
                         <Badge variant={routing.active ? 'success' : 'secondary'}>
