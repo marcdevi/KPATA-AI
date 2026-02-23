@@ -128,7 +128,7 @@ services:
     container_name: kpata-admin-dev
     working_dir: /app/apps/admin
     ports:
-      - "3002:3002"
+      - "3003:3003"
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://api:3000
