@@ -2,9 +2,11 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
+  UserCheck,
   Briefcase,
   ListTodo,
   MessageSquare,
+  Flag,
   TrendingUp,
   Settings,
   CreditCard,
@@ -24,9 +26,11 @@ interface LayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Utilisateurs', href: '/users', icon: Users },
+  { name: 'En attente', href: '/pending-users', icon: UserCheck },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'Queue', href: '/queue', icon: ListTodo },
   { name: 'Tickets', href: '/tickets', icon: MessageSquare },
+  { name: 'Signalements', href: '/reports', icon: Flag },
   { name: 'FinOps', href: '/finops', icon: TrendingUp },
   { name: 'Configuration', href: '/config', icon: Settings },
   { name: 'Tarification', href: '/pricing', icon: CreditCard },

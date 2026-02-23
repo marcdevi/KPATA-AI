@@ -23,6 +23,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       throw new UnauthorizedError('Authentication required');
     }
 
+    // Block pending_approval and banned users from accessing their profile
+    if ((req.user as { status?: string }).status === 'pending_approval') {
+      res.status(403).json({
+        error: {
+          code: 'ACCOUNT_PENDING_APPROVAL',
+          message: 'Votre compte est en attente de validation par un administrateur. Vous recevrez un accès dès que votre compte sera approuvé.',
+        },
+      });
+      return;
+    }
+
     const correlationId = req.correlationId;
     const supabase = getSupabaseClient();
 

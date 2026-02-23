@@ -117,13 +117,23 @@ export async function authMiddleware(
       return next();
     }
 
-    // Check if user is banned
-    if (profile.status === 'banned') {
-      logger.warn('Banned user attempted access', {
-        action: 'auth_banned_user',
+    // Check if user is banned or pending approval
+    if (profile.status === 'banned' || profile.status === 'pending_approval') {
+      logger.warn('Blocked user attempted access', {
+        action: 'auth_blocked_user',
         correlation_id: req.correlationId,
         user_id: profile.id,
+        meta: { status: profile.status },
       });
+      // Attach minimal info so routes can return a specific error message
+      req.user = {
+        id: profile.id,
+        role: profile.role as UserRole,
+        phone: profile.phone_e164 || '',
+        email: (profile as { email?: string | null }).email ?? userEmail,
+        hasProfile: true,
+        status: profile.status,
+      };
       return next();
     }
 
@@ -134,6 +144,7 @@ export async function authMiddleware(
       phone: profile.phone_e164 || '',
       email: (profile as { email?: string | null }).email ?? userEmail,
       hasProfile: true,
+      status: profile.status,
     };
 
     logger.debug('User authenticated', {

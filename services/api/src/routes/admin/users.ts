@@ -256,4 +256,149 @@ router.post(
   }
 );
 
+/**
+ * GET /admin/users/pending
+ * List users with pending_approval status
+ */
+router.get(
+  '/pending',
+  requirePermission(PERMISSIONS.USERS_BAN),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      const supabase = getSupabaseClient();
+
+      const { data, count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .eq('status', 'pending_approval')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({
+        profiles: data || [],
+        total: count || 0,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /admin/users/:id/approve
+ * Approve a pending user
+ */
+router.post(
+  '/:id/approve',
+  requirePermission(PERMISSIONS.USERS_BAN),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      const profileId = req.params.id;
+      const supabase = getSupabaseClient();
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .update({ status: 'active' })
+        .eq('id', profileId)
+        .eq('status', 'pending_approval')
+        .select()
+        .single();
+
+      if (error || !profile) {
+        throw new NotFoundError('Pending profile not found');
+      }
+
+      await supabase.from('admin_audit_logs').insert({
+        actor_id: req.user.id,
+        actor_role: req.user.role,
+        action: 'user_approve',
+        target_type: 'profile',
+        target_id: profileId,
+        ip_address: req.ip || null,
+        user_agent: req.headers['user-agent'] || null,
+      });
+
+      logger.info('User approved', {
+        action: 'user_approved',
+        correlation_id: req.correlationId,
+        user_id: req.user.id,
+        meta: { targetProfileId: profileId },
+      });
+
+      res.json({ profile });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /admin/users/:id/reject
+ * Reject (ban) a pending user
+ */
+const rejectUserSchema = z.object({
+  reason: z.string().min(1).max(500).optional().default('Account rejected during review'),
+});
+
+router.post(
+  '/:id/reject',
+  requirePermission(PERMISSIONS.USERS_BAN),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      const { reason } = rejectUserSchema.parse(req.body);
+      const profileId = req.params.id;
+      const supabase = getSupabaseClient();
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .update({ status: 'banned', ban_reason: reason })
+        .eq('id', profileId)
+        .eq('status', 'pending_approval')
+        .select()
+        .single();
+
+      if (error || !profile) {
+        throw new NotFoundError('Pending profile not found');
+      }
+
+      await supabase.from('admin_audit_logs').insert({
+        actor_id: req.user.id,
+        actor_role: req.user.role,
+        action: 'user_reject',
+        target_type: 'profile',
+        target_id: profileId,
+        reason,
+        ip_address: req.ip || null,
+        user_agent: req.headers['user-agent'] || null,
+      });
+
+      logger.info('User rejected', {
+        action: 'user_rejected',
+        correlation_id: req.correlationId,
+        user_id: req.user.id,
+        meta: { targetProfileId: profileId, reason },
+      });
+
+      res.json({ profile });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

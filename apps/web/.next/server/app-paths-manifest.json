@@ -1,9 +1,5 @@
 {
   "/home/page": "app/home/page.js",
-  "/profile/page": "app/profile/page.js",
-  "/support/page": "app/support/page.js",
   "/login/page": "app/login/page.js",
-  "/mannequin/page": "app/mannequin/page.js",
-  "/credits/page": "app/credits/page.js",
-  "/gallery/page": "app/gallery/page.js"
+  "/page": "app/page.js"
 }

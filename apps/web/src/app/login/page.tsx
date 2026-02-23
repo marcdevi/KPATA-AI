@@ -46,7 +46,17 @@ export default function LoginPage() {
       if (boot.error) throw new Error(boot.error.message);
 
       const me = await getProfile();
-      if (me.error || !me.data) throw new Error(me.error?.message || 'Impossible de charger le profil');
+
+      if (me.error) {
+        if ((me.error as { code?: string }).code === 'ACCOUNT_PENDING_APPROVAL') {
+          await getSupabaseClient().auth.signOut();
+          setInfo('Votre compte est en attente de validation. Un administrateur doit approuver votre accès avant que vous puissiez vous connecter.');
+          return;
+        }
+        throw new Error(me.error.message || 'Impossible de charger le profil');
+      }
+
+      if (!me.data) throw new Error('Impossible de charger le profil');
 
       const hasAcceptedTerms = !!me.data.profile.termsAcceptedAt;
       setAuth({ profileId: me.data.profile.id, phoneE164: me.data.profile.phone, email: me.data.profile.email, role: me.data.profile.role, hasAcceptedTerms, token });

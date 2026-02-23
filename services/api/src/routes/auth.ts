@@ -29,30 +29,47 @@ router.post('/bootstrap', async (req: Request, res: Response, next: NextFunction
     const correlationId = req.correlationId;
     const supabase = getSupabaseClient();
 
-    // Upsert profile with id = auth.uid()
-    const { data: profile, error } = await supabase
+    // Try to find existing profile first
+    const { data: existingProfile } = await supabase
       .from('profiles')
-      .upsert(
-        {
+      .select('*')
+      .eq('id', req.user.id)
+      .single();
+
+    let profile = existingProfile;
+
+    if (!profile) {
+      // New user: create with pending_approval status
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
           id: req.user.id,
           email: req.user.email ?? null,
           role: UserRole.USER_FREE,
-          status: 'active',
-        },
-        { onConflict: 'id' }
-      )
-      .select('*')
-      .single();
+          status: 'pending_approval',
+        })
+        .select('*')
+        .single();
 
-    if (error || !profile) {
-      throw error || new Error('Failed to bootstrap profile');
+      if (insertError || !newProfile) {
+        throw insertError || new Error('Failed to bootstrap profile');
+      }
+
+      profile = newProfile;
+
+      logger.info('New profile created with pending_approval', {
+        action: 'auth_bootstrap_new',
+        correlation_id: correlationId,
+        user_id: req.user.id,
+      });
+    } else {
+      logger.info('Existing profile found during bootstrap', {
+        action: 'auth_bootstrap_existing',
+        correlation_id: correlationId,
+        user_id: req.user.id,
+        meta: { status: profile.status },
+      });
     }
-
-    logger.info('Profile bootstrapped', {
-      action: 'auth_bootstrap',
-      correlation_id: correlationId,
-      user_id: req.user.id,
-    });
 
     res.json({
       ok: true,
@@ -60,6 +77,7 @@ router.post('/bootstrap', async (req: Request, res: Response, next: NextFunction
         id: profile.id,
         email: profile.email ?? null,
         role: profile.role,
+        status: profile.status,
         termsAcceptedAt: profile.terms_accepted_at,
       },
     });
