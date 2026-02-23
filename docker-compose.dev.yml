@@ -98,6 +98,54 @@ services:
     profiles:
       - with-bot
 
+  # Web App (Next.js) - Development with hot reload
+  web:
+    image: node:20-alpine
+    container_name: kpata-web-dev
+    working_dir: /app/apps/web
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - apps/web/.env
+    depends_on:
+      api:
+        condition: service_started
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/web/.next
+    command: sh -c "corepack enable && pnpm install && pnpm dev"
+    networks:
+      - kpata-network-dev
+    restart: unless-stopped
+
+  # Admin Dashboard (Vite + React) - Development with hot reload
+  admin:
+    image: node:20-alpine
+    container_name: kpata-admin-dev
+    working_dir: /app/apps/admin
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://api:3000
+    env_file:
+      - apps/admin/.env
+    depends_on:
+      api:
+        condition: service_started
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/apps/admin/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm dev"
+    networks:
+      - kpata-network-dev
+    restart: unless-stopped
+
 volumes:
   redis_data_dev:
 

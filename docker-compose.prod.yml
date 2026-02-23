@@ -145,6 +145,43 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Admin Dashboard (Vite + React)
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile.prod
+      args:
+        - VITE_API_URL=${VITE_API_URL:-https://api.kpata-ai.online}
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    image: kpata-ai-admin
+    container_name: kpata-ai-admin
+    restart: always
+    ports:
+      - "3002:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - kpata-network-prod
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Telegram Bot (optional)
   telegram-bot:
     build:
