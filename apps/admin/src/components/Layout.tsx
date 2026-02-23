@@ -38,7 +38,7 @@ const navigation = [
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { user, logout, isAdmin, isSuperAdmin } = useAuthStore();
+  const { user, logout, isAdmin } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const filteredNav = navigation.filter((item) => {

@@ -39,7 +39,7 @@ interface QueueResponse {
 export default function QueuePage() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, refetch } = useQuery({
     queryKey: ['queue-status'],
     queryFn: () => api.get<QueueResponse>('/admin/queue/status'),
     refetchInterval: 5000,
