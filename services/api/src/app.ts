@@ -51,6 +51,8 @@ export function createApp(): Express {
       'https://app.kpata-ai.online',
       'https://kpata-ai.online',
       'https://www.kpata-ai.online',
+      'http://kpata-ai.online:3003',
+      'http://admin.kpata-ai.online',
     ],
     credentials: true,
   }));
