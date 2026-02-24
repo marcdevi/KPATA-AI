@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, Play, XCircle, ArrowUp } from 'lucide-react';
+import { RefreshCw, Play, XCircle, ArrowUp, AlertCircle } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -27,6 +27,7 @@ interface QueueJob {
   attemptsMade: number;
   priority: number;
   state: string;
+  failedReason?: string;
 }
 
 interface QueueResponse {
@@ -36,10 +37,14 @@ interface QueueResponse {
   failed: QueueJob[];
 }
 
+function formatDate(ts: number) {
+  return new Date(ts).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+}
+
 export default function QueuePage() {
   const queryClient = useQueryClient();
 
-  const { data, refetch } = useQuery({
+  const { data, refetch, isLoading } = useQuery({
     queryKey: ['queue-status'],
     queryFn: () => api.get<QueueResponse>('/admin/queue/status'),
     refetchInterval: 5000,
@@ -49,7 +54,10 @@ export default function QueuePage() {
     mutationFn: (jobId: string) => api.post(`/admin/queue/retry/${jobId}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['queue-status'] });
-      toast({ title: 'Job relancé' });
+      toast({ title: '✅ Job relancé avec succès' });
+    },
+    onError: (err: Error) => {
+      toast({ title: '❌ Erreur lors du relancement', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -57,7 +65,10 @@ export default function QueuePage() {
     mutationFn: (jobId: string) => api.post(`/admin/queue/cancel/${jobId}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['queue-status'] });
-      toast({ title: 'Job annulé' });
+      toast({ title: '✅ Job annulé' });
+    },
+    onError: (err: Error) => {
+      toast({ title: '❌ Erreur lors de l\'annulation', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -65,18 +76,25 @@ export default function QueuePage() {
     mutationFn: (jobId: string) => api.post(`/admin/queue/prioritize/${jobId}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['queue-status'] });
-      toast({ title: 'Job priorisé' });
+      toast({ title: '✅ Job priorisé' });
+    },
+    onError: (err: Error) => {
+      toast({ title: '❌ Erreur lors de la priorisation', description: err.message, variant: 'destructive' });
     },
   });
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center p-12 text-muted-foreground">Chargement...</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Queue Management</h1>
-          <p className="text-muted-foreground">Gestion de la file d'attente BullMQ</p>
+          <p className="text-muted-foreground">Gestion de la file d'attente des jobs</p>
         </div>
-        <Button onClick={() => refetch()}>
+        <Button onClick={() => refetch()} variant="outline">
           <RefreshCw className="mr-2 h-4 w-4" />
           Actualiser
         </Button>
@@ -122,24 +140,26 @@ export default function QueuePage() {
           <CardTitle>Jobs en cours ({data?.active?.length ?? 0})</CardTitle>
         </CardHeader>
         <CardContent>
-          {data?.active?.length === 0 ? (
+          {!data?.active?.length ? (
             <p className="text-muted-foreground">Aucun job en cours</p>
           ) : (
             <div className="space-y-2">
-              {data?.active?.map((job) => (
+              {data.active.map((job) => (
                 <div key={job.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="font-mono text-sm">{job.data.jobId?.slice(0, 8)}...</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-sm">{job.id.slice(0, 12)}...</p>
                     <p className="text-xs text-muted-foreground">
-                      {job.data.category} • Tentative {job.attemptsMade + 1}
+                      {job.data.category} • Tentative {job.attemptsMade + 1} • {formatDate(job.timestamp)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 ml-4">
                     <Badge variant="warning">En cours</Badge>
                     <Button
                       variant="destructive"
                       size="sm"
+                      disabled={cancelMutation.isPending}
                       onClick={() => cancelMutation.mutate(job.id)}
+                      title="Annuler ce job"
                     >
                       <XCircle className="h-4 w-4" />
                     </Button>
@@ -157,30 +177,35 @@ export default function QueuePage() {
           <CardTitle>Jobs en attente ({data?.waiting?.length ?? 0})</CardTitle>
         </CardHeader>
         <CardContent>
-          {data?.waiting?.length === 0 ? (
+          {!data?.waiting?.length ? (
             <p className="text-muted-foreground">Aucun job en attente</p>
           ) : (
             <div className="space-y-2">
-              {data?.waiting?.slice(0, 20).map((job) => (
+              {data.waiting.slice(0, 50).map((job) => (
                 <div key={job.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="font-mono text-sm">{job.data.jobId?.slice(0, 8)}...</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-sm">{job.id.slice(0, 12)}...</p>
                     <p className="text-xs text-muted-foreground">
-                      {job.data.category} • Priorité: {job.priority}
+                      {job.data.category} • {formatDate(job.timestamp)}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 ml-4">
+                    <Badge variant="secondary">En attente</Badge>
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={prioritizeMutation.isPending}
                       onClick={() => prioritizeMutation.mutate(job.id)}
+                      title="Passer en priorité"
                     >
                       <ArrowUp className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="destructive"
                       size="sm"
+                      disabled={cancelMutation.isPending}
                       onClick={() => cancelMutation.mutate(job.id)}
+                      title="Annuler ce job"
                     >
                       <XCircle className="h-4 w-4" />
                     </Button>
@@ -198,27 +223,38 @@ export default function QueuePage() {
           <CardTitle>Jobs échoués ({data?.failed?.length ?? 0})</CardTitle>
         </CardHeader>
         <CardContent>
-          {data?.failed?.length === 0 ? (
+          {!data?.failed?.length ? (
             <p className="text-muted-foreground">Aucun job échoué</p>
           ) : (
             <div className="space-y-2">
-              {data?.failed?.slice(0, 20).map((job) => (
-                <div key={job.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="font-mono text-sm">{job.data.jobId?.slice(0, 8)}...</p>
-                    <p className="text-xs text-muted-foreground">
-                      {job.data.category} • {job.attemptsMade} tentatives
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => retryMutation.mutate(job.id)}
-                    >
-                      <Play className="mr-1 h-4 w-4" />
-                      Relancer
-                    </Button>
+              {data.failed.slice(0, 50).map((job) => (
+                <div key={job.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono text-sm">{job.id.slice(0, 12)}...</p>
+                      <p className="text-xs text-muted-foreground">
+                        {job.data.category} • {job.attemptsMade} tentative(s) • {formatDate(job.timestamp)}
+                      </p>
+                      {job.failedReason && (
+                        <div className="mt-1 flex items-start gap-1">
+                          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
+                          <p className="text-xs text-red-500 break-all">{job.failedReason}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="destructive">Échoué</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={retryMutation.isPending}
+                        onClick={() => retryMutation.mutate(job.id)}
+                        title="Relancer ce job"
+                      >
+                        <Play className="mr-1 h-4 w-4" />
+                        Relancer
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
