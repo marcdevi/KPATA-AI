@@ -50,7 +50,11 @@ export default function ConfigPage() {
       api.patch(`/admin/config/model-routing/${routing.id}`, routing),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['config'] });
+      setEditingRouting(null);
       toast({ title: 'Configuration mise à jour' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -61,6 +65,9 @@ export default function ConfigPage() {
       queryClient.invalidateQueries({ queryKey: ['config'] });
       setEditingPrompt(null);
       toast({ title: 'Prompt mis à jour' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
     },
   });
 
