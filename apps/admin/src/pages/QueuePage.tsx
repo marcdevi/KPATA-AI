@@ -190,7 +190,9 @@ export default function QueuePage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    <Badge variant="secondary">En attente</Badge>
+                    <Badge variant={job.state === 'queued' ? 'warning' : 'secondary'}>
+                      {job.state === 'queued' ? 'Queued' : 'Pending'}
+                    </Badge>
                     <Button
                       variant="outline"
                       size="sm"

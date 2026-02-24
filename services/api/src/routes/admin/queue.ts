@@ -31,7 +31,7 @@ router.get(
       const { data: statusCounts } = await supabase
         .from('jobs')
         .select('status')
-        .in('status', ['queued', 'processing', 'delivered', 'failed']);
+        .in('status', ['pending', 'queued', 'processing', 'completed', 'failed', 'cancelled']);
 
       const stats = {
         waiting: 0,
@@ -42,17 +42,17 @@ router.get(
       };
 
       statusCounts?.forEach((job) => {
-        if (job.status === 'queued') stats.waiting++;
+        if (job.status === 'pending' || job.status === 'queued') stats.waiting++;
         else if (job.status === 'processing') stats.active++;
-        else if (job.status === 'delivered') stats.completed++;
+        else if (job.status === 'completed') stats.completed++;
         else if (job.status === 'failed') stats.failed++;
       });
 
-      // Get waiting jobs
+      // Get waiting jobs (both pending and queued)
       const { data: waiting } = await supabase
         .from('jobs')
-        .select('id, category, profile_id, created_at')
-        .eq('status', 'queued')
+        .select('id, category, profile_id, created_at, status')
+        .in('status', ['pending', 'queued'])
         .order('created_at', { ascending: true })
         .limit(50);
 
@@ -81,7 +81,7 @@ router.get(
           timestamp: new Date(j.created_at).getTime(),
           attemptsMade: 0,
           priority: 0,
-          state: 'waiting',
+          state: j.status,
         })) || [],
         active: active?.map((j) => ({
           id: j.id,
@@ -125,11 +125,26 @@ router.post(
       const { jobId } = req.params;
       const supabase = getSupabaseClient();
 
-      // Reset job status to queued
+      // Fetch job first to validate it exists and can be retried
+      const { data: existingJob, error: fetchError } = await supabase
+        .from('jobs')
+        .select('id, status')
+        .eq('id', jobId)
+        .single();
+
+      if (fetchError || !existingJob) {
+        throw new NotFoundError('Job not found');
+      }
+
+      if (!['failed', 'cancelled'].includes(existingJob.status)) {
+        throw new Error(`Cannot retry job with status: ${existingJob.status}. Only failed or cancelled jobs can be retried.`);
+      }
+
+      // Reset job status to pending so worker picks it up
       const { data, error } = await supabase
         .from('jobs')
         .update({
-          status: 'queued',
+          status: 'pending',
           error_message: null,
           attempt_count: 0,
         })
@@ -194,8 +209,8 @@ router.post(
       }
 
       // Check if job can be cancelled
-      if (!['queued', 'processing'].includes(existingJob.status)) {
-        throw new Error(`Cannot cancel job with status: ${existingJob.status}. Only queued or processing jobs can be cancelled.`);
+      if (!['pending', 'queued', 'processing'].includes(existingJob.status)) {
+        throw new Error(`Cannot cancel job with status: ${existingJob.status}. Only pending, queued or processing jobs can be cancelled.`);
       }
 
       // Update job status to cancelled
@@ -247,14 +262,14 @@ router.post(
       const { jobId } = req.params;
       const supabase = getSupabaseClient();
 
-      // Update job priority (move to front of queue by setting created_at to past)
+      // Update job priority
       const { data, error } = await supabase
         .from('jobs')
         .update({
           priority: 1,
         })
         .eq('id', jobId)
-        .eq('status', 'queued')
+        .in('status', ['pending', 'queued'])
         .select()
         .single();
 
