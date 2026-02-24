@@ -2,7 +2,7 @@
 
 import { X, Download, Share2, ImageIcon, Grid } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import LoadingScreen from '@/components/LoadingScreen';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
