@@ -39,22 +39,34 @@ export default function ResultPage() {
   const [mountedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
 
-  const loadJob = useCallback(async () => {
+  const jobRef = useRef(job);
+  const assetsRef = useRef(assets);
+  jobRef.current = job;
+  assetsRef.current = assets;
+
+  const loadJob = useCallback(async (isInitial = false) => {
     if (!id) return;
     const res = await getJob(id);
-    if (res.error) { setError(res.error.message); setIsLoading(false); return; }
+    if (res.error) {
+      if (isInitial) { setError(res.error.message); setIsLoading(false); }
+      return;
+    }
     if (res.data) { setJob(res.data.job); setAssets(res.data.assets || []); }
     setIsLoading(false);
   }, [id]);
 
   useEffect(() => {
     if (authLoading) return;
-    loadJob();
+    loadJob(true);
     const interval = setInterval(() => {
-      if (job?.status !== 'completed' || assets.length === 0) loadJob();
+      const currentJob = jobRef.current;
+      const currentAssets = assetsRef.current;
+      if (currentJob?.status !== 'completed' || currentAssets.length === 0) {
+        loadJob(false);
+      }
     }, 2000);
     return () => clearInterval(interval);
-  }, [authLoading, loadJob, job?.status, assets.length]);
+  }, [authLoading, loadJob]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
