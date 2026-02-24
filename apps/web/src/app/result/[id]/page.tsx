@@ -113,7 +113,7 @@ export default function ResultPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-white gap-4 p-6">
         <p className="text-red-500 font-semibold text-center">❌ {error}</p>
-        <button onClick={loadJob} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">Réessayer</button>
+        <button onClick={() => loadJob(true)} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">Réessayer</button>
       </div>
     );
   }
