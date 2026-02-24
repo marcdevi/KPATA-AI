@@ -80,7 +80,7 @@ router.patch(
       }
 
       // Log audit (non-blocking)
-      await supabase.from('admin_audit_logs').insert({
+      void supabase.from('admin_audit_logs').insert({
         actor_id: req.user.id,
         actor_role: req.user.role,
         action: 'config_update',
@@ -89,7 +89,7 @@ router.patch(
         details: updates,
         ip_address: req.ip || null,
         user_agent: req.headers['user-agent'] || null,
-      }).then(() => {}).catch(() => {});
+      });
 
       logger.info('Model routing updated', {
         action: 'model_routing_updated',
@@ -150,7 +150,7 @@ router.patch(
       }
 
       // Log audit (non-blocking)
-      await supabase.from('admin_audit_logs').insert({
+      void supabase.from('admin_audit_logs').insert({
         actor_id: req.user.id,
         actor_role: req.user.role,
         action: 'config_update',
@@ -159,7 +159,7 @@ router.patch(
         details: updates,
         ip_address: req.ip || null,
         user_agent: req.headers['user-agent'] || null,
-      }).then(() => {}).catch(() => {});
+      });
 
       logger.info('Prompt profile updated', {
         action: 'prompt_profile_updated',
