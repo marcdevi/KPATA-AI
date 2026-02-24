@@ -65,6 +65,9 @@ export default function TicketsPage() {
       setReplyText('');
       toast({ title: 'Message envoyé' });
     },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+    },
   });
 
   const closeMutation = useMutation({
@@ -73,6 +76,9 @@ export default function TicketsPage() {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
       setSelectedTicket(null);
       toast({ title: 'Ticket fermé' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
     },
   });
 

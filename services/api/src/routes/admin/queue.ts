@@ -278,12 +278,11 @@ router.post(
         throw new BadRequestError(`Cannot prioritize job with status: ${existingJob.status}. Only pending or queued jobs can be prioritized.`);
       }
 
-      // Move job to front of queue by setting queued_at to earliest possible time
+      // Move job to front of queue by setting priority to 1
       const { data, error } = await supabase
         .from('jobs')
         .update({
-          status: 'queued',
-          queued_at: new Date('2000-01-01').toISOString(),
+          priority: 1,
         })
         .eq('id', jobId)
         .select()

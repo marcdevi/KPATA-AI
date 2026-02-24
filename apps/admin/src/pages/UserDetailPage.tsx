@@ -91,6 +91,9 @@ export default function UserDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['user-detail', id] });
       toast({ title: 'Utilisateur banni' });
     },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+    },
   });
 
   const handleAdjustCredits = (e: React.FormEvent) => {

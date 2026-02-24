@@ -47,6 +47,9 @@ export default function PricingPage() {
       setEditingPack(null);
       toast({ title: 'Pack mis à jour' });
     },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+    },
   });
 
   const updateConfigMutation = useMutation({
@@ -55,6 +58,9 @@ export default function PricingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pricing'] });
       toast({ title: 'Configuration mise à jour' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
     },
   });
 

@@ -45,6 +45,9 @@ export default function ReportsPage() {
       toast({ title: 'Statut mis à jour' });
       setSelectedReport(null);
     },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+    },
   });
 
   const getStatusBadge = (status: string) => {

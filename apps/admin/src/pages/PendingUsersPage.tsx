@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/utils';
+import { toast } from '../components/ui/use-toast';
 
 interface PendingProfile {
   id: string;
@@ -39,6 +40,10 @@ export default function PendingUsersPage() {
       api.post(`/admin/users/${profileId}/approve`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-users'] });
+      toast({ title: 'Utilisateur approuvé' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -49,6 +54,10 @@ export default function PendingUsersPage() {
       queryClient.invalidateQueries({ queryKey: ['pending-users'] });
       setRejectingId(null);
       setRejectReason('');
+      toast({ title: 'Utilisateur refusé' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
     },
   });
 

@@ -79,17 +79,17 @@ router.patch(
         throw error;
       }
 
-      // Log audit
+      // Log audit (non-blocking)
       await supabase.from('admin_audit_logs').insert({
         actor_id: req.user.id,
         actor_role: req.user.role,
         action: 'pricing_update',
         target_type: 'credit_pack',
         target_id: req.params.id,
-        changes_json: updates,
+        details: updates,
         ip_address: req.ip || null,
         user_agent: req.headers['user-agent'] || null,
-      });
+      }).then(() => {}).catch(() => {});
 
       logger.info('Credit pack updated', {
         action: 'credit_pack_updated',
@@ -141,17 +141,17 @@ router.patch(
         throw error;
       }
 
-      // Log audit
+      // Log audit (non-blocking, target_id null since 'pricing' is not a UUID)
       await supabase.from('admin_audit_logs').insert({
         actor_id: req.user.id,
         actor_role: req.user.role,
         action: 'pricing_config_update',
         target_type: 'app_config',
-        target_id: 'pricing',
-        changes_json: updates,
+        target_id: null,
+        details: updates,
         ip_address: req.ip || null,
         user_agent: req.headers['user-agent'] || null,
-      });
+      }).then(() => {}).catch(() => {});
 
       logger.info('Pricing config updated', {
         action: 'pricing_config_updated',
