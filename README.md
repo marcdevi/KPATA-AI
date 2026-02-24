@@ -99,4 +99,4 @@ logger.info('Job started', {
 
 TOKEN_HMAC_SECRET=RIENADIREMAISJEVAISESSAYERCA2026
 
-MEDIA_BASE_URL=https://kpata-media-worker.kpata-ai.workers.dev
+MEDIA_BASE_URL=https://kpata-media-worker.kpata-ai.workers.dev# CI/CD actif
