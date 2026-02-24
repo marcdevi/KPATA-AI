@@ -5,7 +5,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 
-import { UnauthorizedError } from '../../lib/errors.js';
+import { UnauthorizedError, NotFoundError } from '../../lib/errors.js';
 import { getSupabaseClient } from '../../lib/supabase.js';
 import { logger } from '../../logger.js';
 import { requirePermission, PERMISSIONS } from '../../middleware/rbac.js';
@@ -182,7 +182,23 @@ router.post(
       const { jobId } = req.params;
       const supabase = getSupabaseClient();
 
-      // Update job status to cancelled (allow cancelling queued or processing jobs)
+      // First check if job exists and get its current status
+      const { data: existingJob, error: fetchError } = await supabase
+        .from('jobs')
+        .select('id, status')
+        .eq('id', jobId)
+        .single();
+
+      if (fetchError || !existingJob) {
+        throw new NotFoundError('Job not found');
+      }
+
+      // Check if job can be cancelled
+      if (!['queued', 'processing'].includes(existingJob.status)) {
+        throw new Error(`Cannot cancel job with status: ${existingJob.status}. Only queued or processing jobs can be cancelled.`);
+      }
+
+      // Update job status to cancelled
       const { data, error } = await supabase
         .from('jobs')
         .update({
@@ -190,7 +206,6 @@ router.post(
           error_message: 'Cancelled by admin',
         })
         .eq('id', jobId)
-        .in('status', ['queued', 'processing'])
         .select()
         .single();
 
