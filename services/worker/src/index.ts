@@ -15,6 +15,16 @@ let worker: Worker | null = null;
  * Start the worker
  */
 async function start(): Promise<void> {
+  const REQUIRED_ENV = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'REDIS_URL'];
+  const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    logger.error('Missing required environment variables', {
+      action: 'startup_error',
+      meta: { missing },
+    });
+    process.exit(1);
+  }
+
   logger.info('Worker service starting', {
     action: 'startup',
     meta: {
