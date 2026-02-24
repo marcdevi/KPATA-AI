@@ -49,7 +49,9 @@ router.get(
  * Update model routing config (super_admin only)
  */
 const updateRoutingSchema = z.object({
-  primary_model: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  fallback_provider: z.string().optional(),
   fallback_model: z.string().optional(),
   active: z.boolean().optional(),
 });
