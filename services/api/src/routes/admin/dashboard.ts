@@ -33,11 +33,11 @@ router.get(
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      // Get active jobs (queued + processing)
+      // Get active jobs (pending + queued + processing)
       const { count: activeJobs } = await supabase
         .from('jobs')
         .select('*', { count: 'exact', head: true })
-        .in('status', ['queued', 'processing']);
+        .in('status', ['pending', 'queued', 'processing']);
 
       // Get today's revenue
       const { data: todayPayments } = await supabase
@@ -58,10 +58,10 @@ router.get(
       const { data: queueJobs } = await supabase
         .from('jobs')
         .select('status')
-        .in('status', ['queued', 'processing', 'failed']);
+        .in('status', ['pending', 'queued', 'processing', 'failed']);
 
       const queueStats = {
-        waiting: queueJobs?.filter((j) => j.status === 'queued').length || 0,
+        waiting: queueJobs?.filter((j) => j.status === 'pending' || j.status === 'queued').length || 0,
         active: queueJobs?.filter((j) => j.status === 'processing').length || 0,
         failed: queueJobs?.filter((j) => j.status === 'failed').length || 0,
       };

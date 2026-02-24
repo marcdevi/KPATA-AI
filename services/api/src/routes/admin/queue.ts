@@ -5,7 +5,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 
-import { UnauthorizedError, NotFoundError } from '../../lib/errors.js';
+import { UnauthorizedError, NotFoundError, BadRequestError } from '../../lib/errors.js';
 import { getSupabaseClient } from '../../lib/supabase.js';
 import { logger } from '../../logger.js';
 import { requirePermission, PERMISSIONS } from '../../middleware/rbac.js';
@@ -67,7 +67,7 @@ router.get(
       // Get failed jobs
       const { data: failed } = await supabase
         .from('jobs')
-        .select('id, category, profile_id, attempt_count, error_message, created_at')
+        .select('id, category, profile_id, attempt_count, last_error_message, created_at')
         .eq('status', 'failed')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -100,7 +100,7 @@ router.get(
           attemptsMade: j.attempt_count || 0,
           priority: 0,
           state: 'failed',
-          failedReason: j.error_message,
+          failedReason: j.last_error_message,
         })) || [],
       });
     } catch (error) {
@@ -137,7 +137,7 @@ router.post(
       }
 
       if (!['failed', 'cancelled'].includes(existingJob.status)) {
-        throw new Error(`Cannot retry job with status: ${existingJob.status}. Only failed or cancelled jobs can be retried.`);
+        throw new BadRequestError(`Cannot retry job with status: ${existingJob.status}. Only failed or cancelled jobs can be retried.`);
       }
 
       // Reset job status to pending so worker picks it up
@@ -145,7 +145,8 @@ router.post(
         .from('jobs')
         .update({
           status: 'pending',
-          error_message: null,
+          last_error_message: null,
+          last_error_code: null,
           attempt_count: 0,
         })
         .eq('id', jobId)
@@ -210,7 +211,7 @@ router.post(
 
       // Check if job can be cancelled
       if (!['pending', 'queued', 'processing'].includes(existingJob.status)) {
-        throw new Error(`Cannot cancel job with status: ${existingJob.status}. Only pending, queued or processing jobs can be cancelled.`);
+        throw new BadRequestError(`Cannot cancel job with status: ${existingJob.status}. Only pending, queued or processing jobs can be cancelled.`);
       }
 
       // Update job status to cancelled
@@ -218,7 +219,7 @@ router.post(
         .from('jobs')
         .update({
           status: 'cancelled',
-          error_message: 'Cancelled by admin',
+          last_error_message: 'Cancelled by admin',
         })
         .eq('id', jobId)
         .select()
@@ -262,14 +263,29 @@ router.post(
       const { jobId } = req.params;
       const supabase = getSupabaseClient();
 
-      // Update job priority
+      // Check job exists and is in a waiting state
+      const { data: existingJob, error: fetchError } = await supabase
+        .from('jobs')
+        .select('id, status')
+        .eq('id', jobId)
+        .single();
+
+      if (fetchError || !existingJob) {
+        throw new NotFoundError('Job not found');
+      }
+
+      if (!['pending', 'queued'].includes(existingJob.status)) {
+        throw new BadRequestError(`Cannot prioritize job with status: ${existingJob.status}. Only pending or queued jobs can be prioritized.`);
+      }
+
+      // Move job to front of queue by setting queued_at to earliest possible time
       const { data, error } = await supabase
         .from('jobs')
         .update({
-          priority: 1,
+          status: 'queued',
+          queued_at: new Date('2000-01-01').toISOString(),
         })
         .eq('id', jobId)
-        .in('status', ['pending', 'queued'])
         .select()
         .single();
 
