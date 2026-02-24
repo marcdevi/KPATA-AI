@@ -28,6 +28,7 @@ export interface NSFWCheckResult {
 
 /**
  * Load NSFW model (singleton with lazy loading)
+ * Only loads when NSFW_ENABLED=true to avoid hitting dead remote model URLs
  */
 async function loadModel(): Promise<nsfwjs.NSFWJS> {
   if (model) {
@@ -51,6 +52,11 @@ async function loadModel(): Promise<nsfwjs.NSFWJS> {
  * @returns NSFWCheckResult with detection details
  */
 export async function checkNSFW(imageBuffer: Buffer): Promise<NSFWCheckResult> {
+  // Skip NSFW check if not explicitly enabled (model URL may be unavailable)
+  if (process.env.NSFW_ENABLED !== 'true') {
+    return { isNSFW: false, predictions: [] };
+  }
+
   const nsfwModel = await loadModel();
 
   // Decode image to tensor using Jimp (pure JS, no native deps)
