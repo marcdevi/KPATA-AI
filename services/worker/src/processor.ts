@@ -379,7 +379,7 @@ async function uploadResult(
       if (hasR2) {
         // Upload to R2
         const uploadResult = await uploadGalleryImage(
-          { userId: profileId, jobId, pipelineVersion: 1, variant: 'optimized' },
+          { userId: profileId, jobId, pipelineVersion: 1, variant: formatName },
           resizedBuffer,
           { correlationId, contentType: 'image/webp' }
         );
