@@ -134,7 +134,16 @@ export default function QueuePage() {
                       {job.data.category} • Tentative {job.attemptsMade + 1}
                     </p>
                   </div>
-                  <Badge variant="warning">En cours</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="warning">En cours</Badge>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => cancelMutation.mutate(job.id)}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
