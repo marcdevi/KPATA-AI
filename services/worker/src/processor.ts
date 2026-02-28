@@ -378,8 +378,10 @@ async function uploadResult(
 
       if (hasR2) {
         // Upload to R2
+        // Map format names to R2 variant types (instagram/whatsapp are both optimized outputs)
+        const variant: 'original' | 'optimized' | 'thumbnail' = 'optimized';
         const uploadResult = await uploadGalleryImage(
-          { userId: profileId, jobId, pipelineVersion: 1, variant: formatName },
+          { userId: profileId, jobId, pipelineVersion: 1, variant },
           resizedBuffer,
           { correlationId, contentType: 'image/webp' }
         );
