@@ -77,6 +77,58 @@ router.get(
 );
 
 /**
+ * GET /admin/dlq/stats/summary
+ * Get DLQ statistics
+ * NOTE: Must be defined BEFORE /:id to prevent 'stats' matching as an :id param
+ */
+router.get(
+  '/stats/summary',
+  requirePermission(PERMISSIONS.JOBS_VIEW),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      const supabase = getSupabaseClient();
+
+      // Get counts by error code
+      const { data: byErrorCode } = await supabase
+        .from('jobs_failed_definitely')
+        .select('error_code')
+        .is('reviewed_at', null);
+
+      // Count by error code
+      const errorCodeCounts: Record<string, number> = {};
+      for (const row of byErrorCode || []) {
+        errorCodeCounts[row.error_code] = (errorCodeCounts[row.error_code] || 0) + 1;
+      }
+
+      // Get total counts
+      const { count: totalUnreviewed } = await supabase
+        .from('jobs_failed_definitely')
+        .select('*', { count: 'exact', head: true })
+        .is('reviewed_at', null);
+
+      const { count: totalReviewed } = await supabase
+        .from('jobs_failed_definitely')
+        .select('*', { count: 'exact', head: true })
+        .not('reviewed_at', 'is', null);
+
+      res.json({
+        stats: {
+          totalUnreviewed: totalUnreviewed || 0,
+          totalReviewed: totalReviewed || 0,
+          byErrorCode: errorCodeCounts,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /admin/dlq/:id
  * Get single failed job details
  */
@@ -145,57 +197,6 @@ router.patch(
       }
 
       res.json({ failedJob: data });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * GET /admin/dlq/stats
- * Get DLQ statistics
- */
-router.get(
-  '/stats/summary',
-  requirePermission(PERMISSIONS.JOBS_VIEW),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!req.user) {
-        throw new UnauthorizedError('Authentication required');
-      }
-
-      const supabase = getSupabaseClient();
-
-      // Get counts by error code
-      const { data: byErrorCode } = await supabase
-        .from('jobs_failed_definitely')
-        .select('error_code')
-        .is('reviewed_at', null);
-
-      // Count by error code
-      const errorCodeCounts: Record<string, number> = {};
-      for (const row of byErrorCode || []) {
-        errorCodeCounts[row.error_code] = (errorCodeCounts[row.error_code] || 0) + 1;
-      }
-
-      // Get total counts
-      const { count: totalUnreviewed } = await supabase
-        .from('jobs_failed_definitely')
-        .select('*', { count: 'exact', head: true })
-        .is('reviewed_at', null);
-
-      const { count: totalReviewed } = await supabase
-        .from('jobs_failed_definitely')
-        .select('*', { count: 'exact', head: true })
-        .not('reviewed_at', 'is', null);
-
-      res.json({
-        stats: {
-          totalUnreviewed: totalUnreviewed || 0,
-          totalReviewed: totalReviewed || 0,
-          byErrorCode: errorCodeCounts,
-        },
-      });
     } catch (error) {
       next(error);
     }

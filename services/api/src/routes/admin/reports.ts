@@ -76,6 +76,56 @@ router.get(
 );
 
 /**
+ * GET /admin/reports/stats/summary
+ * Get report statistics
+ * NOTE: Must be defined BEFORE /:id to prevent 'stats' matching as an :id param
+ */
+router.get(
+  '/stats/summary',
+  requirePermission(PERMISSIONS.TICKETS_VIEW),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      const supabase = getSupabaseClient();
+
+      // Get counts by status
+      const { data: byStatus } = await supabase
+        .from('content_reports')
+        .select('status');
+
+      const statusCounts: Record<string, number> = {};
+      for (const row of byStatus || []) {
+        statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
+      }
+
+      // Get counts by reason
+      const { data: byReason } = await supabase
+        .from('content_reports')
+        .select('reason')
+        .eq('status', 'pending');
+
+      const reasonCounts: Record<string, number> = {};
+      for (const row of byReason || []) {
+        reasonCounts[row.reason] = (reasonCounts[row.reason] || 0) + 1;
+      }
+
+      res.json({
+        stats: {
+          byStatus: statusCounts,
+          pendingByReason: reasonCounts,
+          totalPending: statusCounts['pending'] || 0,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /admin/reports/:id
  * Get single report details
  */
@@ -174,55 +224,6 @@ router.patch(
       });
 
       res.json({ report: data });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * GET /admin/reports/stats/summary
- * Get report statistics
- */
-router.get(
-  '/stats/summary',
-  requirePermission(PERMISSIONS.TICKETS_VIEW),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!req.user) {
-        throw new UnauthorizedError('Authentication required');
-      }
-
-      const supabase = getSupabaseClient();
-
-      // Get counts by status
-      const { data: byStatus } = await supabase
-        .from('content_reports')
-        .select('status');
-
-      const statusCounts: Record<string, number> = {};
-      for (const row of byStatus || []) {
-        statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
-      }
-
-      // Get counts by reason
-      const { data: byReason } = await supabase
-        .from('content_reports')
-        .select('reason')
-        .eq('status', 'pending');
-
-      const reasonCounts: Record<string, number> = {};
-      for (const row of byReason || []) {
-        reasonCounts[row.reason] = (reasonCounts[row.reason] || 0) + 1;
-      }
-
-      res.json({
-        stats: {
-          byStatus: statusCounts,
-          pendingByReason: reasonCounts,
-          totalPending: statusCounts['pending'] || 0,
-        },
-      });
     } catch (error) {
       next(error);
     }

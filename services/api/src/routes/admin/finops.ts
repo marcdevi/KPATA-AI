@@ -54,7 +54,7 @@ router.get(
       const totalRevenue = payments?.reduce((sum, p) => sum + p.amount_xof, 0) || 0;
 
       // Estimate costs: ~50 FCFA per job on average (simplified)
-      const completedJobs = jobs?.filter((j) => j.status === 'delivered') || [];
+      const completedJobs = jobs?.filter((j) => j.status === 'completed' || j.status === 'delivered') || [];
       const totalCost = completedJobs.length * 50;
 
       const margin = totalRevenue - totalCost;
@@ -92,7 +92,7 @@ router.get(
         const model = j.model_used || 'unknown';
         if (!modelStats[model]) modelStats[model] = { volume: 0, totalCost: 0, failed: 0 };
         modelStats[model].volume++;
-        if (j.status === 'delivered') modelStats[model].totalCost += 50;
+        if (j.status === 'completed' || j.status === 'delivered') modelStats[model].totalCost += 50;
         if (j.status === 'failed') modelStats[model].failed++;
       });
 

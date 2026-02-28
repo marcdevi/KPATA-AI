@@ -22,8 +22,11 @@ export const TEMPLATES = [
 ] as const;
 
 export const JOB_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  queued: { label: 'En attente', color: '#F59E0B' },
+  pending: { label: 'En attente', color: '#F59E0B' },
+  queued: { label: 'En file', color: '#F59E0B' },
   processing: { label: 'En cours', color: '#3B82F6' },
   completed: { label: 'Terminé', color: '#10B981' },
+  delivered: { label: 'Livré', color: '#10B981' },
   failed: { label: 'Échoué', color: '#EF4444' },
+  cancelled: { label: 'Annulé', color: '#6B7280' },
 };
