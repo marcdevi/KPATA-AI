@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Download, Share2, ImageIcon, Grid } from 'lucide-react';
+import { X, Download, Share2, ImageIcon } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
@@ -228,7 +228,7 @@ export default function ResultPage() {
         {/* Secondary actions */}
         <div className="border border-gray-100 rounded-xl overflow-hidden mb-5">
           <button
-            onClick={() => alert('Fonctionnalité en développement')}
+            onClick={() => router.push(`/home?category=${job?.category || 'clothing'}&backgroundStyle=${job?.background_style || 'studio_white'}`)}
             className="w-full flex items-center justify-between px-4 py-4"
           >
             <div className="flex items-center gap-3">
@@ -236,19 +236,6 @@ export default function ResultPage() {
                 <ImageIcon size={16} className="text-gray-500" />
               </div>
               <span className="font-black text-gray-900 text-sm">Regénérer le fond</span>
-            </div>
-            <span className="bg-blue-50 text-blue-600 text-xs font-black px-2.5 py-1.5 rounded-full">1 crédit</span>
-          </button>
-          <div className="h-px bg-gray-100" />
-          <button
-            onClick={() => alert('Fonctionnalité en développement')}
-            className="w-full flex items-center justify-between px-4 py-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Grid size={16} className="text-gray-500" />
-              </div>
-              <span className="font-black text-gray-900 text-sm">Changer le template</span>
             </div>
             <span className="bg-blue-50 text-blue-600 text-xs font-black px-2.5 py-1.5 rounded-full">1 crédit</span>
           </button>

@@ -150,7 +150,7 @@ export async function generateImage(
             content,
           },
         ],
-        modalities: ['image', 'text'],
+        ...(model.startsWith('google/gemini') ? { modalities: ['image', 'text'] } : {}),
       }),
     });
 
@@ -162,36 +162,73 @@ export async function generateImage(
     const data = await response.json() as any;
     const duration = Date.now() - startTime;
 
-    // Extract image from response - OpenRouter returns images in message.images array
+    // Extract image from response - OpenRouter models return images in different formats
     const message = data.choices?.[0]?.message;
+    let extractedBase64: string | null = null;
 
-    if (message?.images && message.images.length > 0) {
+    // Format 1: message.images array (Gemini via OpenRouter)
+    if (!extractedBase64 && message?.images && message.images.length > 0) {
       const imageUrl = message.images[0].image_url?.url;
-
       if (imageUrl && imageUrl.startsWith('data:image')) {
-        // Extract base64 from data URL (format: data:image/png;base64,XXXXX)
-        const base64Data = imageUrl.split(',')[1];
-
-        logger.info('AI image generation completed', {
-          action: 'openrouter_success',
-          correlation_id: correlationId,
-          duration_ms: duration,
-          meta: { model, provider: 'openrouter', imageCount: message.images.length },
-        });
-
-        return {
-          imageBase64: base64Data,
-          model,
-          provider: 'openrouter',
-        };
+        extractedBase64 = imageUrl.split(',')[1];
       }
     }
 
-    // Fallback if no image in response
+    // Format 2: inline_data in content parts (Gemini native format)
+    if (!extractedBase64 && Array.isArray(message?.content)) {
+      for (const part of message.content) {
+        if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:image')) {
+          extractedBase64 = part.image_url.url.split(',')[1];
+          break;
+        }
+        if (part.inline_data?.mime_type?.startsWith('image/') && part.inline_data?.data) {
+          extractedBase64 = part.inline_data.data;
+          break;
+        }
+      }
+    }
+
+    // Format 3: data URL embedded in text content
+    if (!extractedBase64 && typeof message?.content === 'string') {
+      const dataUrlMatch = message.content.match(/data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)/);
+      if (dataUrlMatch) {
+        extractedBase64 = dataUrlMatch[1];
+      }
+    }
+
+    if (extractedBase64) {
+      logger.info('AI image generation completed', {
+        action: 'openrouter_success',
+        correlation_id: correlationId,
+        duration_ms: duration,
+        meta: { model, provider: 'openrouter', imageCount: message?.images?.length || 1 },
+      });
+
+      return {
+        imageBase64: extractedBase64,
+        model,
+        provider: 'openrouter',
+      };
+    }
+
+    // No image found — log detailed response structure for debugging
     logger.warn('No image in OpenRouter response, using placeholder', {
       action: 'openrouter_no_image',
       correlation_id: correlationId,
-      meta: { model, hasImages: !!message?.images },
+      meta: {
+        model,
+        hasImages: !!message?.images,
+        imagesCount: message?.images?.length,
+        contentType: typeof message?.content,
+        contentIsArray: Array.isArray(message?.content),
+        contentPartTypes: Array.isArray(message?.content)
+          ? message.content.map((p: any) => p.type || 'unknown')
+          : undefined,
+        textPreview: typeof message?.content === 'string'
+          ? message.content.substring(0, 200)
+          : undefined,
+        finishReason: data.choices?.[0]?.finish_reason,
+      },
     });
 
     return {

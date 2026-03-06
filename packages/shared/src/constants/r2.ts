@@ -26,6 +26,7 @@ export interface R2KeyParams {
 export interface GalleryKeyParams extends R2KeyParams {
   pipelineVersion: number;
   variant: 'original' | 'optimized' | 'thumbnail';
+  format?: string;
 }
 
 /**
@@ -43,10 +44,11 @@ export function generateRawUploadKey(params: R2KeyParams): string {
 
 /**
  * Generate gallery key
- * Format: gallery/{userId}/{jobId}/v{pipelineVersion}/{variant}.webp
+ * Format: gallery/{userId}/{jobId}/v{pipelineVersion}/{variant}[_{format}].webp
  */
 export function generateGalleryKey(params: GalleryKeyParams): string {
-  return `gallery/${params.userId}/${params.jobId}/v${params.pipelineVersion}/${params.variant}.webp`;
+  const suffix = params.format ? `_${params.format}` : '';
+  return `gallery/${params.userId}/${params.jobId}/v${params.pipelineVersion}/${params.variant}${suffix}.webp`;
 }
 
 /**

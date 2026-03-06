@@ -295,13 +295,47 @@ async function processWithAI(
     }
   }
 
-  // Select model based on mannequin mode
-  // Custom mannequin mode uses gemini-3-pro-image-preview (2 credits)
-  // All other modes use gemini-2.5-flash-image (1 credit)
-  const defaultModel = mannequinMode === 'custom' 
+  // Select model: 1) DB model_routing per category, 2) env var fallback, 3) hardcoded default
+  let model: string;
+  const hardcodedDefault = mannequinMode === 'custom' 
     ? 'google/gemini-3-pro-image-preview'
     : 'google/gemini-2.5-flash-image';
-  const model = process.env.OPENROUTER_MODEL || defaultModel;
+
+  try {
+    const supabase = getSupabase();
+    const { data: routing, error: routingError } = await supabase
+      .from('model_routing')
+      .select('model')
+      .eq('category', category)
+      .eq('active', true)
+      .single();
+
+    if (!routingError && routing?.model) {
+      // Custom mannequin mode always uses the pro model regardless of DB config
+      model = mannequinMode === 'custom'
+        ? 'google/gemini-3-pro-image-preview'
+        : routing.model;
+      logger.info('Using DB model routing', {
+        action: 'model_routing_db',
+        correlation_id: correlationId,
+        meta: { category, model, source: 'database' },
+      });
+    } else {
+      model = process.env.OPENROUTER_MODEL || hardcodedDefault;
+      logger.info('Using fallback model (no DB routing)', {
+        action: 'model_routing_fallback',
+        correlation_id: correlationId,
+        meta: { category, model, source: routingError ? 'env_var' : 'no_active_routing' },
+      });
+    }
+  } catch {
+    model = process.env.OPENROUTER_MODEL || hardcodedDefault;
+    logger.warn('Model routing DB lookup failed, using fallback', {
+      action: 'model_routing_error',
+      correlation_id: correlationId,
+      meta: { category, model },
+    });
+  }
 
   // Check if OpenRouter API is configured
   const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
@@ -318,10 +352,10 @@ async function processWithAI(
       state.model = result.model;
       state.provider = result.provider;
     } catch (error) {
-      logger.warn('OpenRouter processing failed, using placeholder', {
+      logger.error('OpenRouter processing failed, using placeholder', {
         action: 'ai_fallback',
         correlation_id: correlationId,
-        meta: { error: String(error) },
+        meta: { error: String(error), model, category },
       });
       // Fallback to placeholder PNG
       state.processedImageBase64 = await generatePlaceholderImage(1080, 1080, '#10b981');
@@ -381,7 +415,7 @@ async function uploadResult(
         // Map format names to R2 variant types (instagram/whatsapp are both optimized outputs)
         const variant: 'original' | 'optimized' | 'thumbnail' = 'optimized';
         const uploadResult = await uploadGalleryImage(
-          { userId: profileId, jobId, pipelineVersion: 1, variant },
+          { userId: profileId, jobId, pipelineVersion: 1, variant, format: formatName },
           resizedBuffer,
           { correlationId, contentType: 'image/webp' }
         );

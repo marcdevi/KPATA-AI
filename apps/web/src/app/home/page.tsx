@@ -1,8 +1,8 @@
 'use client';
 
 import { Camera, Image as ImageIcon, Zap, Mic } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useState, useRef, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 import AppShell from '@/components/AppShell';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -31,8 +31,22 @@ export default function HomePage() {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceSummary, setVoiceSummary] = useState<string | null>(null);
   const [voicePrompt, setVoicePrompt] = useState<string | null>(null);
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const setVoiceStateRef = useRef<((s: 'done' | 'error') => void) | null>(null);
+
+  // Pre-fill options from URL query params (e.g. from "Regénérer le fond")
+  useEffect(() => {
+    const cat = searchParams.get('category');
+    const bg = searchParams.get('backgroundStyle');
+    if (cat || bg) {
+      setOptions((o) => ({
+        ...o,
+        ...(cat ? { category: cat } : {}),
+        ...(bg ? { backgroundStyle: bg } : {}),
+      }));
+    }
+  }, [searchParams]);
 
   const handleVoiceTranscript = useCallback(async (text: string) => {
     const result = await analyzeVoice({
