@@ -59,6 +59,10 @@ export default function UserDetailPage() {
   const [creditAmount, setCreditAmount] = useState('');
   const [creditReason, setCreditReason] = useState('');
 
+  const [jobsPage, setJobsPage] = useState(1);
+  const [txsPage, setTxsPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   const { data, isLoading } = useQuery({
     queryKey: ['user-detail', id],
     queryFn: () => api.get<UserDetail>(`/admin/users/${id}`),
@@ -112,6 +116,9 @@ export default function UserDetailPage() {
   }
 
   const { profile, credits, recentTransactions, recentJobs, payments } = data;
+
+  const paginatedTxs = recentTransactions?.slice((txsPage - 1) * ITEMS_PER_PAGE, txsPage * ITEMS_PER_PAGE);
+  const paginatedJobs = recentJobs?.slice((jobsPage - 1) * ITEMS_PER_PAGE, jobsPage * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -268,7 +275,7 @@ export default function UserDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentTransactions?.map((tx) => (
+                {paginatedTxs?.map((tx) => (
                   <tr key={tx.id} className="border-b">
                     <td className="px-4 py-2">
                       <Badge variant="outline">{tx.entry_type}</Badge>
@@ -285,6 +292,13 @@ export default function UserDetailPage() {
               </tbody>
             </table>
           </div>
+          {recentTransactions && recentTransactions.length > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-between pt-4">
+              <Button variant="outline" size="sm" onClick={() => setTxsPage(p => p - 1)} disabled={txsPage === 1}>Précédent</Button>
+              <span className="text-sm text-muted-foreground">Page {txsPage} sur {Math.ceil(recentTransactions.length / ITEMS_PER_PAGE)}</span>
+              <Button variant="outline" size="sm" onClick={() => setTxsPage(p => p + 1)} disabled={txsPage >= Math.ceil(recentTransactions.length / ITEMS_PER_PAGE)}>Suivant</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -342,7 +356,7 @@ export default function UserDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentJobs?.map((job) => (
+                {paginatedJobs?.map((job) => (
                   <tr key={job.id} className="border-b">
                     <td className="px-4 py-2 font-mono text-xs">{job.id.slice(0, 8)}...</td>
                     <td className="px-4 py-2">{job.category}</td>
@@ -359,6 +373,13 @@ export default function UserDetailPage() {
               </tbody>
             </table>
           </div>
+          {recentJobs && recentJobs.length > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-between pt-4">
+              <Button variant="outline" size="sm" onClick={() => setJobsPage(p => p - 1)} disabled={jobsPage === 1}>Précédent</Button>
+              <span className="text-sm text-muted-foreground">Page {jobsPage} sur {Math.ceil(recentJobs.length / ITEMS_PER_PAGE)}</span>
+              <Button variant="outline" size="sm" onClick={() => setJobsPage(p => p + 1)} disabled={jobsPage >= Math.ceil(recentJobs.length / ITEMS_PER_PAGE)}>Suivant</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

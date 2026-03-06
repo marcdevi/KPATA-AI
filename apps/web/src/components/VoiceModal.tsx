@@ -16,6 +16,78 @@ interface VoiceModalProps {
   onConfirm: () => void;
 }
 
+function SoundVisualizer({ isListening }: { isListening: boolean }) {
+  const barsRef = useRef<HTMLDivElement[]>([]);
+
+  useEffect(() => {
+    if (!isListening) return;
+    const interval = setInterval(() => {
+      barsRef.current.forEach((bar) => {
+        if (bar) {
+          const h = Math.random() * 28 + 8;
+          bar.style.height = `${h}px`;
+        }
+      });
+    }, 120);
+    return () => clearInterval(interval);
+  }, [isListening]);
+
+  if (!isListening) return null;
+
+  return (
+    <div className="flex items-center justify-center gap-1.5 mb-6 h-10">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div
+          key={i}
+          ref={(el) => { if (el) barsRef.current[i] = el; }}
+          className="w-1.5 rounded-full bg-red-400 transition-all duration-100"
+          style={{ height: `${Math.random() * 24 + 8}px` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StatusIcon({ state }: { state: VoiceState }) {
+  return (
+    <div className="flex items-center justify-center mb-8">
+      {state === 'idle' && (
+        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center">
+          <Mic size={40} className="text-blue-600" />
+        </div>
+      )}
+
+      {state === 'listening' && (
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-32 h-32 rounded-full bg-red-100 animate-ping opacity-30" />
+          <div className="absolute w-24 h-24 rounded-full bg-red-100 animate-ping opacity-40" style={{ animationDelay: '0.2s' }} />
+          <div className="w-20 h-20 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-200">
+            <Mic size={32} className="text-white" />
+          </div>
+        </div>
+      )}
+
+      {state === 'processing' && (
+        <div className="w-24 h-24 rounded-full bg-indigo-50 flex items-center justify-center">
+          <Loader2 size={40} className="text-indigo-600 animate-spin" />
+        </div>
+      )}
+
+      {state === 'done' && (
+        <div className="w-24 h-24 rounded-full bg-green-50 flex items-center justify-center">
+          <CheckCircle size={40} className="text-green-500" />
+        </div>
+      )}
+
+      {state === 'error' && (
+        <div className="w-24 h-24 rounded-full bg-red-50 flex items-center justify-center">
+          <AlertCircle size={40} className="text-red-500" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function VoiceModal({
   state,
   transcript,
@@ -26,21 +98,6 @@ export default function VoiceModal({
   onClose,
   onConfirm,
 }: VoiceModalProps) {
-  const barsRef = useRef<HTMLDivElement[]>([]);
-
-  // Animate bars while listening
-  useEffect(() => {
-    if (state !== 'listening') return;
-    const interval = setInterval(() => {
-      barsRef.current.forEach((bar) => {
-        if (bar) {
-          const h = Math.random() * 28 + 8;
-          bar.style.height = `${h}px`;
-        }
-      });
-    }, 120);
-    return () => clearInterval(interval);
-  }, [state]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm">
@@ -73,56 +130,10 @@ export default function VoiceModal({
         </p>
 
         {/* Visual feedback */}
-        <div className="flex items-center justify-center mb-8">
-          {state === 'idle' && (
-            <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center">
-              <Mic size={40} className="text-blue-600" />
-            </div>
-          )}
-
-          {state === 'listening' && (
-            <div className="relative flex items-center justify-center">
-              {/* Pulse rings */}
-              <div className="absolute w-32 h-32 rounded-full bg-red-100 animate-ping opacity-30" />
-              <div className="absolute w-24 h-24 rounded-full bg-red-100 animate-ping opacity-40" style={{ animationDelay: '0.2s' }} />
-              <div className="w-20 h-20 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-200">
-                <Mic size={32} className="text-white" />
-              </div>
-            </div>
-          )}
-
-          {state === 'processing' && (
-            <div className="w-24 h-24 rounded-full bg-indigo-50 flex items-center justify-center">
-              <Loader2 size={40} className="text-indigo-600 animate-spin" />
-            </div>
-          )}
-
-          {state === 'done' && (
-            <div className="w-24 h-24 rounded-full bg-green-50 flex items-center justify-center">
-              <CheckCircle size={40} className="text-green-500" />
-            </div>
-          )}
-
-          {state === 'error' && (
-            <div className="w-24 h-24 rounded-full bg-red-50 flex items-center justify-center">
-              <AlertCircle size={40} className="text-red-500" />
-            </div>
-          )}
-        </div>
+        <StatusIcon state={state} />
 
         {/* Sound bars (listening only) */}
-        {state === 'listening' && (
-          <div className="flex items-center justify-center gap-1.5 mb-6 h-10">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div
-                key={i}
-                ref={(el) => { if (el) barsRef.current[i] = el; }}
-                className="w-1.5 rounded-full bg-red-400 transition-all duration-100"
-                style={{ height: `${Math.random() * 24 + 8}px` }}
-              />
-            ))}
-          </div>
-        )}
+        <SoundVisualizer isListening={state === 'listening'} />
 
         {/* Transcript */}
         {transcript && state !== 'idle' && (

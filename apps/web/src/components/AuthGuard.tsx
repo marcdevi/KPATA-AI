@@ -63,16 +63,19 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [mounted, isLoading, isAuthenticated, hasAcceptedTerms, pathname, router]);
 
+  const isPublic = PUBLIC_ROUTES.includes(pathname);
+  const isTerms = pathname === TERMS_ROUTE;
+
   if (!mounted || isLoading) {
+    // Avoid blocking SSR and hydration for public pages
+    if (isPublic) return <>{children}</>;
+
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
-
-  const isPublic = PUBLIC_ROUTES.includes(pathname);
-  const isTerms = pathname === TERMS_ROUTE;
 
   if (!isAuthenticated && !isPublic) return null;
   if (!isAuthenticated && isTerms) return null;

@@ -59,14 +59,22 @@ export function createApp(): Express {
     credentials: true,
   }));
 
-  // Body parsing - 50mb to support base64 image uploads (~37MB image = ~50MB base64)
+  // Helper for raw body verification
+  const rawBodyVerify = (req: Request, _res: Response, buf: Buffer) => {
+    (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+  };
+
+  // High limit parser for specific routes that need large image uploads
+  const highLimitJson = express.json({ limit: '50mb', verify: rawBodyVerify });
+  const highLimitUrl = express.urlencoded({ extended: true, limit: '50mb' });
+  app.use('/jobs', highLimitJson, highLimitUrl);
+
+  // Global body parsing - defaulted to 2mb to prevent DoS attacks
   app.use(express.json({
-    limit: '50mb',
-    verify: (req, _res, buf) => {
-      (req as unknown as { rawBody?: Buffer }).rawBody = buf;
-    },
+    limit: '2mb',
+    verify: rawBodyVerify,
   }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
   // Correlation ID middleware
   app.use(correlationMiddleware);

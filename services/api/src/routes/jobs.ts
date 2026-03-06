@@ -313,29 +313,42 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       throw error;
     }
 
-    // Fetch thumbnail URLs for completed jobs
-    const jobsWithThumbnails = await Promise.all(
-      (jobs || []).map(async (job) => {
-        if (job.status === 'completed') {
-          const { data: assets } = await supabase
-            .from('assets')
-            .select('metadata')
-            .eq('job_id', job.id)
-            .eq('type', 'output_image')
-            .order('created_at', { ascending: true })
-            .limit(1);
-          
-          return {
-            ...job,
-            thumbnail_url: assets?.[0]?.metadata?.url || null,
-          };
-        }
+    // Fetch thumbnail URLs for completed jobs efficiently without N+1 query
+    const completedJobIds = (jobs || [])
+      .filter((j) => j.status === 'completed')
+      .map((j) => j.id);
+
+    const assetsMap = new Map<string, string>();
+    
+    if (completedJobIds.length > 0) {
+      const { data: assets } = await supabase
+        .from('assets')
+        .select('job_id, metadata')
+        .in('job_id', completedJobIds)
+        .eq('type', 'output_image')
+        .order('created_at', { ascending: true });
+        
+      if (assets) {
+        assets.forEach(a => {
+           if (!assetsMap.has(a.job_id) && a.metadata?.url) {
+             assetsMap.set(a.job_id, a.metadata.url as string);
+           }
+        });
+      }
+    }
+
+    const jobsWithThumbnails = (jobs || []).map((job) => {
+      if (job.status === 'completed' && assetsMap.has(job.id)) {
         return {
           ...job,
-          thumbnail_url: null,
+          thumbnail_url: assetsMap.get(job.id),
         };
-      })
-    );
+      }
+      return {
+        ...job,
+        thumbnail_url: null,
+      };
+    });
 
     res.json({
       jobs: jobsWithThumbnails,
