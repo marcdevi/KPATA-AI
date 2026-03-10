@@ -66,6 +66,30 @@ export interface JobPayload {
   mannequinBodyKey?: string;
 }
 
+export interface MannequinJobPayload {
+  profileId: string;
+  correlationId: string;
+  mannequinId: string;
+  originalImageBucket: string;
+  originalImageKey: string;
+}
+
+let mannequinQueue: Queue | null = null;
+
+function getMannequinQueue(): Queue {
+  if (!mannequinQueue) {
+    mannequinQueue = new Queue(QUEUE_NAMES.MANNEQUIN_JOBS, {
+      connection: getRedisConnection(),
+      defaultJobOptions: {
+        attempts: RETRY_CONFIG.MAX_ATTEMPTS,
+        removeOnComplete: { count: 500, age: 24 * 60 * 60 },
+        removeOnFail: { count: 2000, age: 7 * 24 * 60 * 60 },
+      },
+    });
+  }
+  return mannequinQueue;
+}
+
 /**
  * Publish a job to the queue
  */
@@ -93,6 +117,26 @@ export async function publishJob(payload: JobPayload): Promise<string> {
   );
 
   return job.id || payload.jobId;
+}
+
+/**
+ * Publish a mannequin generation job to the queue
+ */
+export async function publishMannequinJob(payload: MannequinJobPayload): Promise<string> {
+  const queue = getMannequinQueue();
+
+  const job = await queue.add(
+    'generate-mannequin',
+    payload,
+    {
+      jobId: `mannequin-${payload.mannequinId}`,
+      priority: JOB_PRIORITIES.HIGH,
+      attempts: 2,
+      backoff: { type: 'custom' },
+    }
+  );
+
+  return job.id || payload.mannequinId;
 }
 
 /**

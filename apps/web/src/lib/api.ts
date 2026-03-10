@@ -109,6 +109,10 @@ export async function createMannequin(data: { faceImageBase64: string; bodyImage
   return request<{ mannequin: { id: string; faceImageUrl: string; bodyImageUrl: string } }>('POST', '/mannequins', data);
 }
 
+export async function generateStudioMannequin(data: { imageBase64: string; isCelebrityConfirmed: boolean }) {
+  return request<{ mannequin: { id: string; status: string } }>('POST', '/mannequins/generate-studio', data);
+}
+
 export async function createTicket(subject: string, message: string) {
   return request<{ ticket: { id: string } }>('POST', '/support/tickets', { subject, message });
 }

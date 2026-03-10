@@ -3,13 +3,16 @@
  * BullMQ worker that processes image jobs
  */
 
+import { QUEUE_NAMES, getBackoffDelay } from '@kpata/shared';
 import { Worker } from 'bullmq';
 
-import { createWorker, closeConnection } from './lib/queue.js';
+import { getRedisConnection, closeConnection } from './lib/queue.js';
 import { logger } from './logger.js';
 import { processJob } from './processor.js';
+import { processMannequinJob, MannequinJobPayload } from './mannequinProcessor.js';
 
 let worker: Worker | null = null;
+let mannequinWorker: Worker | null = null;
 
 /**
  * Start the worker
@@ -34,10 +37,26 @@ async function start(): Promise<void> {
     },
   });
 
-  // Create and start worker
+  // Create and start main image processing worker
+  const { createWorker } = await import('./lib/queue.js');
   worker = createWorker(processJob);
 
-  // Event handlers
+  // Create and start mannequin generation worker
+  mannequinWorker = new Worker<MannequinJobPayload>(
+    QUEUE_NAMES.MANNEQUIN_JOBS,
+    async (job) => {
+      await processMannequinJob(job.data);
+    },
+    {
+      connection: getRedisConnection(),
+      concurrency: 2, // Fewer concurrent mannequin jobs (they're heavy AI calls)
+      settings: {
+        backoffStrategy: (attemptsMade: number) => getBackoffDelay(attemptsMade),
+      },
+    }
+  );
+
+  // Event handlers for main worker
   worker.on('completed', (job) => {
     logger.info('Job completed', {
       action: 'job_completed',
@@ -65,6 +84,26 @@ async function start(): Promise<void> {
     });
   });
 
+  // Event handlers for mannequin worker
+  mannequinWorker.on('completed', (job) => {
+    logger.info('Mannequin job completed', {
+      action: 'mannequin_job_completed',
+      correlation_id: job.data.correlationId,
+      meta: { mannequinId: job.data.mannequinId },
+    });
+  });
+
+  mannequinWorker.on('failed', (job, error) => {
+    logger.error('Mannequin job failed', {
+      action: 'mannequin_job_failed',
+      correlation_id: job?.data.correlationId,
+      meta: {
+        mannequinId: job?.data.mannequinId,
+        error: error.message,
+      },
+    });
+  });
+
   logger.info('Worker started and listening for jobs', {
     action: 'worker_ready',
   });
@@ -79,6 +118,11 @@ async function shutdown(): Promise<void> {
   if (worker) {
     await worker.close();
     worker = null;
+  }
+
+  if (mannequinWorker) {
+    await mannequinWorker.close();
+    mannequinWorker = null;
   }
 
   await closeConnection();

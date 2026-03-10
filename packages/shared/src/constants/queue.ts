@@ -5,6 +5,7 @@
 
 export const QUEUE_NAMES = {
   JOBS: 'kpata-jobs',
+  MANNEQUIN_JOBS: 'kpata-mannequin-jobs',
   NOTIFICATIONS: 'kpata-notifications',
 } as const;
 

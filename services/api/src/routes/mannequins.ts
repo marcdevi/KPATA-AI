@@ -9,6 +9,7 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../logger.js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { publishMannequinJob } from '../lib/queue.js';
 
 // R2 upload helper
 async function uploadToR2(key: string, buffer: Buffer, contentType: string): Promise<{ bucket: string; key: string; url: string }> {
@@ -51,6 +52,107 @@ const createMannequinSchema = z.object({
   isCelebrityConfirmed: z.boolean().refine(val => val === true, {
     message: 'Must confirm that images do not represent a celebrity',
   }),
+});
+
+const generateStudioSchema = z.object({
+  imageBase64: z.string().min(1),
+  isCelebrityConfirmed: z.boolean().refine(val => val === true, {
+    message: 'Must confirm that images do not represent a celebrity',
+  }),
+});
+
+/**
+ * POST /mannequins/generate-studio
+ * Generate studio-quality face + body photos from a single full-body photo via AI
+ */
+router.post('/generate-studio', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const { imageBase64, isCelebrityConfirmed } = generateStudioSchema.parse(req.body);
+    const supabase = getSupabaseClient();
+    const profileId = req.user.id;
+
+    logger.info('Starting mannequin studio generation', {
+      action: 'mannequin_studio_start',
+      correlation_id: req.correlationId,
+      user_id: profileId,
+    });
+
+    // Upload original photo to R2
+    const originalBuffer = Buffer.from(imageBase64, 'base64');
+    const originalKey = `mannequins/${profileId}/original_${Date.now()}.webp`;
+    const originalUpload = await uploadToR2(originalKey, originalBuffer, 'image/webp');
+
+    // Check if mannequin already exists
+    const { data: existing } = await supabase
+      .from('mannequins')
+      .select('id')
+      .eq('profile_id', profileId)
+      .single();
+
+    let mannequinId: string;
+
+    if (existing) {
+      // Update existing mannequin to 'generating' status
+      await supabase
+        .from('mannequins')
+        .update({
+          status: 'generating',
+          is_celebrity_confirmed: isCelebrityConfirmed,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+      mannequinId = existing.id;
+    } else {
+      // Create new mannequin with 'generating' status
+      const { data: newMannequin, error: insertError } = await supabase
+        .from('mannequins')
+        .insert({
+          profile_id: profileId,
+          face_image_bucket: originalUpload.bucket,
+          face_image_key: originalUpload.key,
+          face_image_url: originalUpload.url,
+          body_image_bucket: originalUpload.bucket,
+          body_image_key: originalUpload.key,
+          body_image_url: originalUpload.url,
+          is_celebrity_confirmed: isCelebrityConfirmed,
+          status: 'generating',
+        })
+        .select('id')
+        .single();
+
+      if (insertError) throw insertError;
+      mannequinId = newMannequin.id;
+    }
+
+    // Publish mannequin generation job
+    await publishMannequinJob({
+      profileId,
+      correlationId: req.correlationId,
+      mannequinId,
+      originalImageBucket: originalUpload.bucket,
+      originalImageKey: originalUpload.key,
+    });
+
+    logger.info('Mannequin studio job published', {
+      action: 'mannequin_studio_published',
+      correlation_id: req.correlationId,
+      user_id: profileId,
+      meta: { mannequinId },
+    });
+
+    res.json({
+      mannequin: {
+        id: mannequinId,
+        status: 'generating',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**
@@ -182,7 +284,6 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction): Promi
       .from('mannequins')
       .select('id, face_image_url, body_image_url, status, created_at, updated_at')
       .eq('profile_id', req.user.id)
-      .eq('status', 'active')
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned

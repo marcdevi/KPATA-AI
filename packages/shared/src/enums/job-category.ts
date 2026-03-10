@@ -5,5 +5,6 @@ export enum JobCategory {
   SHOES = 'shoes',
   JEWELRY = 'jewelry',
   BAGS = 'bags',
+  MANNEQUIN = 'mannequin',
   OTHER = 'other',
 }
